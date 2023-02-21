@@ -1900,38 +1900,38 @@ void freeServerClientMemUsageBuckets() {
 
 void initServerConfig(void) {
     int j;
-    char *default_bindaddr[CONFIG_DEFAULT_BINDADDR_COUNT] = CONFIG_DEFAULT_BINDADDR;
+    char *default_bindaddr[CONFIG_DEFAULT_BINDADDR_COUNT] = CONFIG_DEFAULT_BINDADDR;        //ldc:默认绑定IP地址
 
-    initConfigValues();
-    updateCachedTime(1);
-    getRandomHexChars(server.runid,CONFIG_RUN_ID_SIZE);
+    initConfigValues();        //ldc:根据static_configs初始化configs
+    updateCachedTime(1);        //初始化server.ustime、server.mstime、server.unixtime
+    getRandomHexChars(server.runid,CONFIG_RUN_ID_SIZE);     //ldc:随机生成server.runid
     server.runid[CONFIG_RUN_ID_SIZE] = '\0';
-    changeReplicationId();
-    clearReplicationId2();
-    server.hz = CONFIG_DEFAULT_HZ; /* Initialize it ASAP, even if it may get
+    changeReplicationId();      //ldc:随机生成server.replid
+    clearReplicationId2();      //ldc:把server.replid2内容全部设置为0
+    server.hz = CONFIG_DEFAULT_HZ; /* Initialize it ASAP, even if it may get        //ldc:置默认服务器频率为10毫秒
                                       updated later after loading the config.
                                       This value may be used before the server
                                       is initialized. */
-    server.timezone = getTimeZone(); /* Initialized by tzset(). */
+    server.timezone = getTimeZone(); /* Initialized by tzset(). */          //ldc:设置时区
     server.configfile = NULL;
     server.executable = NULL;
-    server.arch_bits = (sizeof(long) == 8) ? 64 : 32;
-    server.bindaddr_count = CONFIG_DEFAULT_BINDADDR_COUNT;
-    for (j = 0; j < CONFIG_DEFAULT_BINDADDR_COUNT; j++)
+    server.arch_bits = (sizeof(long) == 8) ? 64 : 32;       //ldc:设置服务器的运行架构
+    server.bindaddr_count = CONFIG_DEFAULT_BINDADDR_COUNT;  //ldc:绑定地址个数为2
+    for (j = 0; j < CONFIG_DEFAULT_BINDADDR_COUNT; j++)     //ldc:初始化绑定地址
         server.bindaddr[j] = zstrdup(default_bindaddr[j]);
     server.ipfd.count = 0;
     server.tlsfd.count = 0;
     server.sofd = -1;
-    server.active_expire_enabled = 1;
+    server.active_expire_enabled = 1;       //ldc:开启 expire 定期清理功能
     server.skip_checksum_validation = 0;
     server.loading = 0;
-    server.async_loading = 0;
+    server.async_loading = 0;       //ldc:开启异步加载
     server.loading_rdb_used_mem = 0;
-    server.aof_state = AOF_OFF;
+    server.aof_state = AOF_OFF;     //ldc:默认不开启aof
     server.aof_rewrite_base_size = 0;
     server.aof_rewrite_scheduled = 0;
-    server.aof_flush_sleep = 0;
-    server.aof_last_fsync = time(NULL);
+    server.aof_flush_sleep = 0;     //ldc:aof刷盘前sleep 0微妙
+    server.aof_last_fsync = time(NULL);     //ldc:aof上次刷盘的unix时间
     server.aof_cur_timestamp = 0;
     atomicSet(server.aof_bio_fsync_status,C_OK);
     server.aof_rewrite_time_last = -1;
@@ -1943,8 +1943,8 @@ void initServerConfig(void) {
     server.aof_flush_postponed_start = 0;
     server.aof_last_incr_size = 0;
     server.active_defrag_running = 0;
-    server.notify_keyspace_events = 0;
-    server.blocked_clients = 0;
+    server.notify_keyspace_events = 0;      //ldc:Events to propagate via Pub/Sub
+    server.blocked_clients = 0;     //ldc:执行阻塞命令的客户端数
     memset(server.blocked_clients_by_type,0,
            sizeof(server.blocked_clients_by_type));
     server.shutdown_asap = 0;
@@ -1952,7 +1952,7 @@ void initServerConfig(void) {
     server.shutdown_mstime = 0;
     server.cluster_module_flags = CLUSTER_MODULE_FLAG_NONE;
     server.migrate_cached_sockets = dictCreate(&migrateCacheDictType);
-    server.next_client_id = 1; /* Client IDs, start from 1 .*/
+    server.next_client_id = 1; /* Client IDs, start from 1 .*/      //ldc:客户端id从1开始
     server.page_size = sysconf(_SC_PAGESIZE);
     server.pause_cron = 0;
 
@@ -2447,12 +2447,12 @@ void makeThreadKillable(void) {
 void initServer(void) {
     int j;
 
-    signal(SIGHUP, SIG_IGN);
-    signal(SIGPIPE, SIG_IGN);
-    setupSignalHandlers();
-    makeThreadKillable();
+    signal(SIGHUP, SIG_IGN);    //ldc:SIGHUP和控制台操作有关，当控制台被关闭时系统会向拥有控制台sessionID的所有进程发送HUP信号，默认HUP信号的action是 exit
+    signal(SIGPIPE, SIG_IGN);   //ldc:当服务器close一个连接时，若client端接着发数据。根据TCP 协议的规定，会收到一个RST响应，client再往这个服务器发送数据时，系统会发出一个SIGPIPE信号给进程，告诉进程这个连接已经断开了，不要再写了。根据信号的默认处理规则SIGPIPE信号的默认执行动作是terminate(终止、退出),所以client会退出。若不想客户端退出可以把SIGPIPE设为SIG_IGN
+    setupSignalHandlers();      //ldc:注册信号处理函数
+    makeThreadKillable();       //ldc:设置线程允许被kill
 
-    if (server.syslog_enabled) {
+    if (server.syslog_enabled) {    ////ldc:打开日志
         openlog(server.syslog_ident, LOG_PID | LOG_NDELAY | LOG_NOWAIT,
             server.syslog_facility);
     }
@@ -6888,16 +6888,16 @@ int main(int argc, char **argv) {
     spt_init(argc, argv);
 #endif
     setlocale(LC_COLLATE,"");
-    tzset(); /* Populates 'timezone' global. */
-    zmalloc_set_oom_handler(redisOutOfMemoryHandler);
+    tzset(); /* Populates 'timezone' global. */     //ldc:设置时区
+    zmalloc_set_oom_handler(redisOutOfMemoryHandler);       //ldc:设置oom处理函数
 
     /* To achieve entropy, in case of containers, their time() and getpid() can
      * be the same. But value of tv_usec is fast enough to make the difference */
     gettimeofday(&tv,NULL);
     srand(time(NULL)^getpid()^tv.tv_usec);
     srandom(time(NULL)^getpid()^tv.tv_usec);
-    init_genrand64(((long long) tv.tv_sec * 1000000 + tv.tv_usec) ^ getpid());
-    crc64_init();
+    init_genrand64(((long long) tv.tv_sec * 1000000 + tv.tv_usec) ^ getpid());      //ldc:初始化64位版本的Mersenne（跟伪随机数相关）
+    crc64_init();       //ldc:crc64用于RDB、集群间同步校验,crc16用于对计算 key 所处槽的位置
 
     /* Store umask value. Because umask(2) only offers a set-and-get API we have
      * to reset it and restore it back. We do this early to avoid a potential
@@ -6905,13 +6905,13 @@ int main(int argc, char **argv) {
      */
     umask(server.umask = umask(0777));
 
-    uint8_t hashseed[16];
-    getRandomBytes(hashseed,sizeof(hashseed));
-    dictSetHashFunctionSeed(hashseed);
+    uint8_t hashseed[16];       //ldc:hash因子
+    getRandomBytes(hashseed,sizeof(hashseed));      //ldc:获取随机数种子
+    dictSetHashFunctionSeed(hashseed);      //ldc:把hashseed设置到dict.c 的 static uint8_t dict_hash_function_seed[16] 中
 
-    char *exec_name = strrchr(argv[0], '/');
+    char *exec_name = strrchr(argv[0], '/');        //ldc:char *strrchr(const char *str, int c) 在参数 str 所指向的字符串中搜索最后一次出现字符 c(一个无符号字符)的位置
     if (exec_name == NULL) exec_name = argv[0];
-    server.sentinel_mode = checkForSentinelMode(argc,argv, exec_name);
+    server.sentinel_mode = checkForSentinelMode(argc,argv, exec_name);      //ldc:检查启动命令中是否指定哨兵模式
     initServerConfig();
     ACLInit(); /* The ACL subsystem must be initialized ASAP because the
                   basic networking code and client creation depends on it. */

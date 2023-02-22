@@ -1908,7 +1908,7 @@ void initServerConfig(void) {
     server.runid[CONFIG_RUN_ID_SIZE] = '\0';
     changeReplicationId();      //ldc:随机生成server.replid
     clearReplicationId2();      //ldc:把server.replid2内容全部设置为0
-    server.hz = CONFIG_DEFAULT_HZ; /* Initialize it ASAP, even if it may get        //ldc:置默认服务器频率为10毫秒
+    server.hz = CONFIG_DEFAULT_HZ; /* Initialize it ASAP, even if it may get        //ldc:置默认服务器频率为10,1秒/10=100毫秒
                                       updated later after loading the config.
                                       This value may be used before the server
                                       is initialized. */
@@ -1953,29 +1953,29 @@ void initServerConfig(void) {
     server.cluster_module_flags = CLUSTER_MODULE_FLAG_NONE;
     server.migrate_cached_sockets = dictCreate(&migrateCacheDictType);
     server.next_client_id = 1; /* Client IDs, start from 1 .*/      //ldc:客户端id从1开始
-    server.page_size = sysconf(_SC_PAGESIZE);
-    server.pause_cron = 0;
+    server.page_size = sysconf(_SC_PAGESIZE);       //ldc:调用sysconf()函数获取系统的配置信息.  _SC_PAGESIZE：系统页大小（page size）. 参考:https://zhuanlan.zhihu.com/p/385642428
+    server.pause_cron = 0;      //ldc:Don't run cron tasks (debug)
 
-    server.latency_tracking_info_percentiles_len = 3;
+    server.latency_tracking_info_percentiles_len = 3;       //ldc:Redis 扩展的延迟监控可跟踪每个命令的延迟，延迟的开销非常小，并可通过INFO latencystats命令导出百分比分布，以及通过LATENCY命令导出直方图。默认为yes、未启用
     server.latency_tracking_info_percentiles = zmalloc(sizeof(double)*(server.latency_tracking_info_percentiles_len));
     server.latency_tracking_info_percentiles[0] = 50.0;  /* p50 */
     server.latency_tracking_info_percentiles[1] = 99.0;  /* p99 */
     server.latency_tracking_info_percentiles[2] = 99.9;  /* p999 */
 
-    unsigned int lruclock = getLRUClock();
+    unsigned int lruclock = getLRUClock();      //ldc:每个键值对中的值，会使用一个 redisObject 结构体来保存指向值的指针。其中除了记录值的指针以外，它其实还会使用 24 bits 来保存 LRU 时钟信息，对应的是 lru 成员变量。每个键值对都会把它最近一次被访问的时间戳，记录在 lru 变量当中.  参考:https://www.cnblogs.com/ltaodream/p/16299107.html
     atomicSet(server.lruclock,lruclock);
-    resetServerSaveParams();
+    resetServerSaveParams();        //ldc:初始化 Save points array for RDB 和Number of saving points
 
     appendServerSaveParams(60*60,1);  /* save after 1 hour and 1 change */
     appendServerSaveParams(300,100);  /* save after 5 minutes and 100 changes */
     appendServerSaveParams(60,10000); /* save after 1 minute and 10000 changes */
 
     /* Replication related */
-    server.masterhost = NULL;
-    server.masterport = 6379;
-    server.master = NULL;
-    server.cached_master = NULL;
-    server.master_initial_offset = -1;
+    server.masterhost = NULL;       //ldc:master ip
+    server.masterport = 6379;       //ldc:master 端口
+    server.master = NULL;       //ldc:client *master;     /* Client that is master for this slave */
+    server.cached_master = NULL;        //ldc:client *cached_master; /* Cached master to be reused for PSYNC. */
+    server.master_initial_offset = -1;      //ldc:初始化PSYNC同步的偏移量
     server.repl_state = REPL_STATE_NONE;
     server.repl_transfer_tmpfile = NULL;
     server.repl_transfer_fd = -1;
@@ -1985,10 +1985,10 @@ void initServerConfig(void) {
     server.master_repl_offset = 0;
 
     /* Replication partial resync backlog */
-    server.repl_backlog = NULL;
+    server.repl_backlog = NULL;     //ldc:挤压缓存
     server.repl_no_slaves_since = time(NULL);
 
-    /* Failover related */
+    /* Failover related */      //ldc:故障转移
     server.failover_end_time = 0;
     server.force_failover = 0;
     server.target_replica_host = NULL;
@@ -1996,11 +1996,11 @@ void initServerConfig(void) {
     server.failover_state = NO_FAILOVER;
 
     /* Client output buffer limits */
-    for (j = 0; j < CLIENT_TYPE_OBUF_COUNT; j++)
+    for (j = 0; j < CLIENT_TYPE_OBUF_COUNT; j++)        //ldc:普通、主从、订阅的output buffer限制不一样
         server.client_obuf_limits[j] = clientBufferLimitsDefaults[j];
 
     /* Linux OOM Score config */
-    for (j = 0; j < CONFIG_OOM_COUNT; j++)
+    for (j = 0; j < CONFIG_OOM_COUNT; j++)      //把主、从、后台子进程的oom分值分别设置为0、200、800,OOM优先kill分数高的.  参考:https://github.com/redis/redis/pull/1690/files
         server.oom_score_adj_values[j] = configOOMScoreAdjValuesDefaults[j];
 
     /* Double constants initialization */
@@ -2014,10 +2014,10 @@ void initServerConfig(void) {
      * redis.conf using the rename-command directive. */
     server.commands = dictCreate(&commandTableDictType);
     server.orig_commands = dictCreate(&commandTableDictType);
-    populateCommandTable();
+    populateCommandTable();        //ldc:初始化server的commands、orig_commands
 
     /* Debugging */
-    server.watchdog_period = 0;
+    server.watchdog_period = 0;     //ldc:不开启watchdog
 }
 
 extern char **environ;

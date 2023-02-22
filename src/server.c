@@ -6912,7 +6912,7 @@ int main(int argc, char **argv) {
     char *exec_name = strrchr(argv[0], '/');        //ldc:char *strrchr(const char *str, int c) 在参数 str 所指向的字符串中搜索最后一次出现字符 c(一个无符号字符)的位置
     if (exec_name == NULL) exec_name = argv[0];
     server.sentinel_mode = checkForSentinelMode(argc,argv, exec_name);      //ldc:检查启动命令中是否指定哨兵模式
-    initServerConfig();
+    initServerConfig();     //ldc:初始化server参数
     ACLInit(); /* The ACL subsystem must be initialized ASAP because the
                   basic networking code and client creation depends on it. */
     moduleInitModulesSystem();

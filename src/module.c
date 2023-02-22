@@ -10979,7 +10979,7 @@ dictType sdsKeyValueHashDictType = {
 
 void moduleInitModulesSystem(void) {
     moduleUnblockedClients = listCreate();
-    server.loadmodule_queue = listCreate();
+    server.loadmodule_queue = listCreate();     //ldc:loadmodule_queue为redis需要加载模块路径数组, 会再redis初始化配置文件时添加
     server.module_configs_queue = dictCreate(&sdsKeyValueHashDictType);
     modules = dictCreate(&modulesDictType);
 
@@ -10989,7 +10989,7 @@ void moduleInitModulesSystem(void) {
     /* Set up filter list */
     moduleCommandFilters = listCreate();
 
-    moduleRegisterCoreAPI();
+    moduleRegisterCoreAPI();        //ldc:moduleRegisterCoreAPI为注册函数的主要逻辑, 首先创建用于存放api函数的字典, 该字典key提供给module的函数名称, value为module.c中具体的实现, 通过维护字典的方式实现了提供给模块的接口与redis内部实现相分离.
 
     /* Create a pipe for module threads to be able to wake up the redis main thread.
      * Make the pipe non blocking. This is just a best effort aware mechanism

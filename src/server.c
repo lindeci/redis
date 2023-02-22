@@ -1713,17 +1713,17 @@ void afterSleep(struct aeEventLoop *eventLoop) {
 
 /* =========================== Server initialization ======================== */
 
-void createSharedObjects(void) {
+void createSharedObjects(void) {        //ldc:这里面有部分值是要放到输出缓冲区里面的，为了保证内存中只有一份值，所以可以将这些对象共享起来，这样可以节约内存
     int j;
 
     /* Shared command responses */
     shared.crlf = createObject(OBJ_STRING,sdsnew("\r\n"));
-    shared.ok = createObject(OBJ_STRING,sdsnew("+OK\r\n"));
+    shared.ok = createObject(OBJ_STRING,sdsnew("+OK\r\n"));     //ldc:这里的值都是要放到 Redis 输出缓冲区里面的，要返回给客户端的
     shared.emptybulk = createObject(OBJ_STRING,sdsnew("$0\r\n\r\n"));
     shared.czero = createObject(OBJ_STRING,sdsnew(":0\r\n"));
     shared.cone = createObject(OBJ_STRING,sdsnew(":1\r\n"));
     shared.emptyarray = createObject(OBJ_STRING,sdsnew("*0\r\n"));
-    shared.pong = createObject(OBJ_STRING,sdsnew("+PONG\r\n"));
+    shared.pong = createObject(OBJ_STRING,sdsnew("+PONG\r\n"));     //ldc:客户端发送 ping 命令时，服务端会发送 pong 命令
     shared.queued = createObject(OBJ_STRING,sdsnew("+QUEUED\r\n"));
     shared.emptyscan = createObject(OBJ_STRING,sdsnew("*2\r\n$1\r\n0\r\n*0\r\n"));
     shared.space = createObject(OBJ_STRING,sdsnew(" "));
@@ -1856,7 +1856,7 @@ void createSharedObjects(void) {
     shared.special_equals = createStringObject("=",1);
     shared.redacted = makeObjectShared(createStringObject("(redacted)",10));
 
-    for (j = 0; j < OBJ_SHARED_INTEGERS; j++) {
+    for (j = 0; j < OBJ_SHARED_INTEGERS; j++) {     //ldc:存了 [0, OBJ_SHARED_INTEGERS) 的数字常量
         shared.integers[j] =
             makeObjectShared(createObject(OBJ_STRING,(void*)(long)j));
         shared.integers[j]->encoding = OBJ_ENCODING_INT;
@@ -2504,11 +2504,11 @@ void initServer(void) {
         exit(1);
     }
 
-    createSharedObjects();
-    adjustOpenFilesLimit();
+    createSharedObjects();      //ldc:创建共享对象
+    adjustOpenFilesLimit();     //ldc:调整文件句柄大小
     const char *clk_msg = monotonicInit();
-    serverLog(LL_NOTICE, "monotonic clock: %s", clk_msg);
-    server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
+    serverLog(LL_NOTICE, "monotonic clock: %s", clk_msg);       //ldc:打印 * monotonic clock: POSIX clock_gettime
+    server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);     //ldc:创建eventloop对象 参数为10000+32+96=10128
     if (server.el == NULL) {
         serverLog(LL_WARNING,
             "Failed creating the event loop. Error message: '%s'",
@@ -6163,7 +6163,7 @@ void daemonize(void) {
     }
 }
 
-void version(void) {
+void version(void) {        //ldc:打印redis版本
     printf("Redis server v=%s sha=%s:%d malloc=%s bits=%d build=%llx\n",
         REDIS_VERSION,
         redisGitSHA1(),
@@ -6174,7 +6174,7 @@ void version(void) {
     exit(0);
 }
 
-void usage(void) {
+void usage(void) {        //ldc:打印redis启动命令语法
     fprintf(stderr,"Usage: ./redis-server [/path/to/redis.conf] [options] [-]\n");
     fprintf(stderr,"       ./redis-server - (read config from stdin)\n");
     fprintf(stderr,"       ./redis-server -v or --version\n");
@@ -6913,13 +6913,13 @@ int main(int argc, char **argv) {
     if (exec_name == NULL) exec_name = argv[0];
     server.sentinel_mode = checkForSentinelMode(argc,argv, exec_name);      //ldc:检查启动命令中是否指定哨兵模式
     initServerConfig();     //ldc:初始化server参数
-    ACLInit(); /* The ACL subsystem must be initialized ASAP because the
+    ACLInit(); /* The ACL subsystem must be initialized ASAP because the        //ldc:Redis ACL是Access Control List（访问控制列表）
                   basic networking code and client creation depends on it. */
-    moduleInitModulesSystem();
-    tlsInit();
+    moduleInitModulesSystem();      //ldc:初始化模块 加载动态链接库
+    tlsInit();      //ldc:TLS 通道加密
 
     /* Store the executable path and arguments in a safe place in order
-     * to be able to restart the server later. */
+     * to be able to restart the server later. */       //ldc:获取应用的绝对路径、参数,存放在server.exec_argv
     server.executable = getAbsolutePath(argv[0]);
     server.exec_argv = zmalloc(sizeof(char*)*(argc+1));
     server.exec_argv[argc] = NULL;
@@ -6929,23 +6929,23 @@ int main(int argc, char **argv) {
      * in sentinel mode will have the effect of populating the sentinel
      * data structures with master nodes to monitor. */
     if (server.sentinel_mode) {
-        initSentinelConfig();
+        initSentinelConfig();       //ldc:设置server.port=REDIS_SENTINEL_PORT=26379、server.protected_mode = 0
         initSentinel();
     }
 
     /* Check if we need to start in redis-check-rdb/aof mode. We just execute
      * the program main. However the program is part of the Redis executable
      * so that we can easily execute an RDB check on loading errors. */
-    if (strstr(exec_name,"redis-check-rdb") != NULL)
+    if (strstr(exec_name,"redis-check-rdb") != NULL)        //ldc:如果启动redis-check-rdb，则对rdb文件进行检查
         redis_check_rdb_main(argc,argv,NULL);
-    else if (strstr(exec_name,"redis-check-aof") != NULL)
+    else if (strstr(exec_name,"redis-check-aof") != NULL)       //ldc://ldc:如果启动redis-check-aof，则对aof文件进行检查
         redis_check_aof_main(argc,argv);
 
     if (argc >= 2) {
         j = 1; /* First option to parse in argv[] */
         sds options = sdsempty();
 
-        /* Handle special options --help and --version */
+        /* Handle special options --help and --version */       //ldc:处理特殊启动参数
         if (strcmp(argv[1], "-v") == 0 ||
             strcmp(argv[1], "--version") == 0) version();
         if (strcmp(argv[1], "--help") == 0 ||
@@ -6960,12 +6960,12 @@ int main(int argc, char **argv) {
                 exit(1);
             }
         } if (strcmp(argv[1], "--check-system") == 0) {
-            exit(syscheck() ? 0 : 1);
+            exit(syscheck() ? 0 : 1);       //ldc:检查OS的slow-clocksource、xen-clocksource、overcommit、THP
         }
         /* Parse command line options
          * Precedence wise, File, stdin, explicit options -- last config is the one that matters.
          *
-         * First argument is the config file name? */
+         * First argument is the config file name? */       //ldc:允许配置文件前面不加-
         if (argv[1][0] != '-') {
             /* Replace the config file in server.exec_argv with its absolute path. */
             server.configfile = getAbsolutePath(argv[1]);
@@ -6978,7 +6978,7 @@ int main(int argc, char **argv) {
         int handled_last_config_arg = 1;
         while(j < argc) {
             /* Either first or last argument - Should we read config from stdin? */
-            if (argv[j][0] == '-' && argv[j][1] == '\0' && (j == 1 || j == argc-1)) {
+            if (argv[j][0] == '-' && argv[j][1] == '\0' && (j == 1 || j == argc-1)) {       //ldc:如果满足左边条件，则进行从命令行读取字符
                 config_from_stdin = 1;
             }
             /* All the other options are parsed and conceptually appended to the
@@ -7054,12 +7054,12 @@ int main(int argc, char **argv) {
         if (server.sentinel_mode) loadSentinelConfigFromQueue();
         sdsfree(options);
     }
-    if (server.sentinel_mode) sentinelCheckConfigFile();
+    if (server.sentinel_mode) sentinelCheckConfigFile();        //ldc:检查sentinel config file和是否有write权限
     server.supervised = redisIsSupervised(server.supervised_mode);
     int background = server.daemonize && !server.supervised;
-    if (background) daemonize();
+    if (background) daemonize();        //ldc:fork子进程,父进程 exit(0),子进程变成孤儿进程
 
-    serverLog(LL_WARNING, "oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo");
+    serverLog(LL_WARNING, "oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo");     //ldc:打印启动日志前3行
     serverLog(LL_WARNING,
         "Redis version=%s, bits=%d, commit=%s, modified=%d, pid=%d, just started",
             REDIS_VERSION,

@@ -2444,7 +2444,7 @@ void makeThreadKillable(void) {
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 }
 
-void initServer(void) {
+void initServer(void) {     //ldc:设置信号量、线程属性、打开日志、为config中的配置创建对象、创建共享对象、调整文件句柄、初始化monotonic、eventloop、进行对外通讯(TCP、TLS、UNIX Domain Socket)的监听、初始化databases、EvictionPoolLRU、订阅、RDB、其它、统计信息、初始化定时器、对通讯(TCP、TLS、UNIX Domain Socket、module_pipe[0])进行epoll_ctl绑定和注册连接处理函数、调整32位架构的最大内存限制、初始化server.cluster、脚本、engine data结构、延时监听、ACL密码、watchdog、ServerClient总内存限制
     int j;
 
     signal(SIGHUP, SIG_IGN);    //ldc:SIGHUP和控制台操作有关，当控制台被关闭时系统会向拥有控制台sessionID的所有进程发送HUP信号，默认HUP信号的action是 exit
@@ -2517,22 +2517,22 @@ void initServer(void) {
     }
     server.db = zmalloc(sizeof(redisDb)*server.dbnum);
 
-    /* Open the TCP listening socket for the user commands. */
+    /* Open the TCP listening socket for the user commands. */      //ldc:分别在IPV4和IPV6上创建套接字、监听端口
     if (server.port != 0 &&
         listenToPort(server.port,&server.ipfd) == C_ERR) {
         /* Note: the following log text is matched by the test suite. */
         serverLog(LL_WARNING, "Failed listening on port %u (TCP), aborting.", server.port);
         exit(1);
     }
-    if (server.tls_port != 0 &&
+    if (server.tls_port != 0 &&     //ldc:默认没启动tls加密通道
         listenToPort(server.tls_port,&server.tlsfd) == C_ERR) {
         /* Note: the following log text is matched by the test suite. */
         serverLog(LL_WARNING, "Failed listening on port %u (TLS), aborting.", server.tls_port);
         exit(1);
     }
 
-    /* Open the listening Unix domain socket. */
-    if (server.unixsocket != NULL) {
+    /* Open the listening Unix domain socket. */        //LDC:UNIX Domain Socket是在socket架构上发展起来的用于同一台主机的进程间通讯(IPC),它不需要经过网络协议栈,不需要打包拆包、计算校验和、维护序号和应答等
+    if (server.unixsocket != NULL) {        //ldc:默认不开启
         unlink(server.unixsocket); /* don't care if this fails */
         server.sofd = anetUnixServer(server.neterr,server.unixsocket,
             (mode_t)server.unixsocketperm, server.tcp_backlog);
@@ -2551,7 +2551,7 @@ void initServer(void) {
     }
 
     /* Create the Redis databases, and initialize other internal state. */
-    for (j = 0; j < server.dbnum; j++) {
+    for (j = 0; j < server.dbnum; j++) {        //ldc:初始化databases
         server.db[j].dict = dictCreate(&dbDictType);
         server.db[j].expires = dictCreate(&dbExpiresDictType);
         server.db[j].expires_cursor = 0;
@@ -2564,7 +2564,7 @@ void initServer(void) {
         server.db[j].slots_to_keys = NULL; /* Set by clusterInit later on if necessary. */
         listSetFreeMethod(server.db[j].defrag_later,(void (*)(void*))sdsfree);
     }
-    evictionPoolAlloc(); /* Initialize the LRU keys pool. */
+    evictionPoolAlloc(); /* Initialize the LRU keys pool. */        //ldc:初始化EvictionPoolLRU
     server.pubsub_channels = dictCreate(&keylistDictType);
     server.pubsub_patterns = dictCreate(&keylistDictType);
     server.pubsubshard_channels = dictCreate(&keylistDictType);
@@ -2596,7 +2596,7 @@ void initServer(void) {
     server.rdb_last_load_keys_expired = 0;
     server.rdb_last_load_keys_loaded = 0;
     server.dirty = 0;
-    resetServerStats();
+    resetServerStats();     //ldc:重置server的统计信息为0
     /* A few stats we don't want to reset: server startup time, and peak mem. */
     server.stat_starttime = time(NULL);
     server.stat_peak_memory = 0;
@@ -2626,26 +2626,26 @@ void initServer(void) {
     /* Create the timer callback, this is our way to process many background
      * operations incrementally, like clients timeout, eviction of unaccessed
      * expired keys and so forth. */
-    if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {
+    if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {        //ldc:注册定时任务回调函数serverCron,比如客户端timeout、KEY的TTL
         serverPanic("Can't create event loop timers.");
         exit(1);
     }
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
-    if (createSocketAcceptHandler(&server.ipfd, acceptTcpHandler) != C_OK) {
+    if (createSocketAcceptHandler(&server.ipfd, acceptTcpHandler) != C_OK) {        //ldc:对TPC的IPV4、IPV6连接进行epoll_ctl绑定，注册连接处理函数acceptTcpHandler
         serverPanic("Unrecoverable error creating TCP socket accept handler.");
     }
-    if (createSocketAcceptHandler(&server.tlsfd, acceptTLSHandler) != C_OK) {
+    if (createSocketAcceptHandler(&server.tlsfd, acceptTLSHandler) != C_OK) {       //ldc:对tls通道连接进行epoll_ctl绑定，注册连接处理函数acceptTLSHandler。默认不启动
         serverPanic("Unrecoverable error creating TLS socket accept handler.");
     }
-    if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,
+    if (server.sofd > 0 && aeCreateFileEvent(server.el,server.sofd,AE_READABLE,     //ldc:对Unix domain socket连接进行epoll_ctl绑定，注册连接处理函数acceptUnixHandler。默认不启动
         acceptUnixHandler,NULL) == AE_ERR) serverPanic("Unrecoverable error creating server.sofd file event.");
 
 
     /* Register a readable event for the pipe used to awake the event loop
      * from module threads. */
-    if (aeCreateFileEvent(server.el, server.module_pipe[0], AE_READABLE,
+    if (aeCreateFileEvent(server.el, server.module_pipe[0], AE_READABLE,        //ldc:对module_pipe[0]注册连接处理函数modulePipeReadable
         modulePipeReadable,NULL) == AE_ERR) {
             serverPanic(
                 "Error registering the readable event for the module pipe.");
@@ -2653,31 +2653,31 @@ void initServer(void) {
 
     /* Register before and after sleep handlers (note this needs to be done
      * before loading persistence since it is used by processEventsWhileBlocked. */
-    aeSetBeforeSleepProc(server.el,beforeSleep);
-    aeSetAfterSleepProc(server.el,afterSleep);
+    aeSetBeforeSleepProc(server.el,beforeSleep);        //ldc:eventLoop->beforesleep = beforesleep;
+    aeSetAfterSleepProc(server.el,afterSleep);      //ldc:eventLoop->aftersleep = aftersleep;
 
     /* 32 bit instances are limited to 4GB of address space, so if there is
      * no explicit limit in the user provided configuration we set a limit
      * at 3 GB using maxmemory with 'noeviction' policy'. This avoids
      * useless crashes of the Redis instance for out of memory. */
-    if (server.arch_bits == 32 && server.maxmemory == 0) {
+    if (server.arch_bits == 32 && server.maxmemory == 0) {      //ldc:如果OS是32位,最大内存不做限制，则限制最大内存为3G，淘汰策略为不淘汰
         serverLog(LL_WARNING,"Warning: 32 bit instance detected but no memory limit set. Setting 3 GB maxmemory limit with 'noeviction' policy now.");
         server.maxmemory = 3072LL*(1024*1024); /* 3 GB */
         server.maxmemory_policy = MAXMEMORY_NO_EVICTION;
     }
 
-    if (server.cluster_enabled) clusterInit();
-    scriptingInit(1);
-    functionsInit();
-    slowlogInit();
-    latencyMonitorInit();
+    if (server.cluster_enabled) clusterInit();      //ldc:对server.cluster进行初始化
+    scriptingInit(1);       //ldc:Initialize the scripting environment.
+    functionsInit();        //ldc:Initialize engine data structures.
+    slowlogInit();      //ldc:Initialize the slow log.
+    latencyMonitorInit();       //ldc:延时监听初始化操作，创建Event字典对象
 
     /* Initialize ACL default password if it exists */
-    ACLUpdateDefaultUserPassword(server.requirepass);
+    ACLUpdateDefaultUserPassword(server.requirepass);       //ldc:设置ACL密码
 
-    applyWatchdogPeriod();
+    applyWatchdogPeriod();        //ldc:如果server.watchdog_period则关闭watchdog,否则调整定时器配置
 
-    if (server.maxmemory_clients != 0)
+    if (server.maxmemory_clients != 0)      //ldc:初始化client_mem_usage_buckets[CLIENT_MEM_USAGE_BUCKETS]的mem_usage_sum、clients
         initServerClientMemUsageBuckets();
 }
 
@@ -2687,9 +2687,9 @@ void initServer(void) {
  * Thread Local Storage initialization collides with dlopen call.
  * see: https://sourceware.org/bugzilla/show_bug.cgi?id=19329 */
 void InitServerLast() {
-    bioInit();
-    initThreadedIO();
-    set_jemalloc_bg_thread(server.jemalloc_bg_thread);
+    bioInit();      //ldc:初始化bio多线程(ackground I/O,是Redis的后台IO服务,不是代表磁盘IO)
+    initThreadedIO();       //ldc:初始化threaded I/O的数据结构
+    set_jemalloc_bg_thread(server.jemalloc_bg_thread);      //ldc:flushdb后，如果no traffic,let jemalloc do purging asynchronously
     server.initial_memory_usage = zmalloc_used_memory();
 }
 
@@ -7074,13 +7074,13 @@ int main(int argc, char **argv) {
         serverLog(LL_WARNING, "Configuration loaded");
     }
 
-    initServer();
-    if (background || server.pidfile) createPidFile();
-    if (server.set_proc_title) redisSetProcTitle(NULL);
-    redisAsciiArt();
-    checkTcpBacklogSettings();
+    initServer();       //ldc:设置信号量、线程属性、打开日志、为config中的配置创建对象、创建共享对象、调整文件句柄、初始化monotonic、eventloop、进行对外通讯(TCP、TLS、UNIX Domain Socket)的监听、初始化databases、EvictionPoolLRU、订阅、RDB、其它、统计信息、初始化定时器、对通讯(TCP、TLS、UNIX Domain Socket、module_pipe[0])进行epoll_ctl绑定和注册连接处理函数、调整32位架构的最大内存限制、初始化server.cluster、脚本、engine data结构、延时监听、ACL密码、watchdog、ServerClient总内存限制
+    if (background || server.pidfile) createPidFile();      //ldc:打印pid到/var/run/redis_6379.pid
+    if (server.set_proc_title) redisSetProcTitle(NULL);     //ldc:设置proctitle(比如:/data/redis/src/redis-server 127.0.0.1:6379)
+    redisAsciiArt();        //ldc:打印启动的redis logo图形
+    checkTcpBacklogSettings();      //ldc:判断server.tcp_backlog是否在限制范围内，相对/proc/sys/net/core/somaxconn中的值
 
-    if (!server.sentinel_mode) {
+    if (!server.sentinel_mode) {        //如果不是哨兵模式,则到此初始化server完毕
         /* Things not needed when running in Sentinel mode. */
         serverLog(LL_WARNING,"Server initialized");
     #ifdef __linux__
@@ -7107,38 +7107,38 @@ int main(int argc, char **argv) {
         }
     #endif /* __arm64__ */
     #endif /* __linux__ */
-        moduleInitModulesSystemLast();
-        moduleLoadFromQueue();
-        ACLLoadUsersAtStartup();
-        InitServerLast();
-        aofLoadManifestFromDisk();
-        loadDataFromDisk();
-        aofOpenIfNeededOnServerStart();
-        aofDelHistoryFiles();
+        moduleInitModulesSystemLast();      //ldc:目前改函数内容为空
+        moduleLoadFromQueue();      //ldc:根据server.loadmodule_queue加载模块
+        ACLLoadUsersAtStartup();        //ldc:ACL加载用户配置
+        InitServerLast();       //ldc:初始化3个线程:bioInit、initThreadedIO、set_jemalloc_bg_thread;获取server.initial_memory_usage
+        aofLoadManifestFromDisk();      //ldc:Load the manifest information from the disk to `server.aof_manifest`(Used to track AOFs)
+        loadDataFromDisk();     //ldc:load RDB or AOF file in memory
+        aofOpenIfNeededOnServerStart();     //ldc:如果开启server.aof_state,会做三件事：1. 如果dataset为空则创建BASE文件 2. 如果打不开上次的可写的AOFOpen,则新建一个 3. 同步manifest文件到硬盘
+        aofDelHistoryFiles();       //ldc:如果AOFRW成功,则之前的BASE and INCR AOFs 会成为历史并移到 history_aof_list
         if (server.cluster_enabled) {
-            if (verifyClusterConfigWithData() == C_ERR) {
+            if (verifyClusterConfigWithData() == C_ERR) {     //ldc:检查集群 1、slot配置是否正确(漏、重复) 2、DB0以外的DB是否有数据(cluster只能使用db0)
                 serverLog(LL_WARNING,
                     "You can't have keys in a DB different than DB 0 when in "
                     "Cluster mode. Exiting.");
                 exit(1);
             }
         }
-        if (server.ipfd.count > 0 || server.tlsfd.count > 0)
+        if (server.ipfd.count > 0 || server.tlsfd.count > 0)        //ldc:打印Ready to accept connections
             serverLog(LL_NOTICE,"Ready to accept connections");
-        if (server.sofd > 0)
+        if (server.sofd > 0)        //ldc:打印The server is now ready to accept connections at xxx
             serverLog(LL_NOTICE,"The server is now ready to accept connections at %s", server.unixsocket);
-        if (server.supervised_mode == SUPERVISED_SYSTEMD) {
-            if (!server.masterhost) {
+        if (server.supervised_mode == SUPERVISED_SYSTEMD) {     //ldc:如果是SUPERVISED_SYSTEMD管理redis模式(比如systemd启动)
+            if (!server.masterhost) {       //ldc:server.masterhost为空，说明是master节点
                 redisCommunicateSystemd("STATUS=Ready to accept connections\n");
-            } else {
+            } else {        //ldc:从节点，则以read-only模式接受连接,等待 MASTER <-> REPLICA 同步
                 redisCommunicateSystemd("STATUS=Ready to accept connections in read-only mode. Waiting for MASTER <-> REPLICA sync\n");
             }
             redisCommunicateSystemd("READY=1\n");
         }
-    } else {
-        ACLLoadUsersAtStartup();
-        InitServerLast();
-        sentinelIsRunning();
+    } else {        //ldc:如果是哨兵模式
+        ACLLoadUsersAtStartup();        //ldc:ACL加载用户配置
+        InitServerLast();       //ldc:初始化3个线程:bioInit、initThreadedIO、set_jemalloc_bg_thread;获取server.initial_memory_usage
+        sentinelIsRunning();        //ldc:启动、加载配置
         if (server.supervised_mode == SUPERVISED_SYSTEMD) {
             redisCommunicateSystemd("STATUS=Ready to accept connections\n");
             redisCommunicateSystemd("READY=1\n");
@@ -7146,15 +7146,15 @@ int main(int argc, char **argv) {
     }
 
     /* Warning the user about suspicious maxmemory setting. */
-    if (server.maxmemory > 0 && server.maxmemory < 1024*1024) {
+    if (server.maxmemory > 0 && server.maxmemory < 1024*1024) {     //ldc:如果maxmemory设置小于1M,则打印告警
         serverLog(LL_WARNING,"WARNING: You specified a maxmemory value that is less than 1MB (current value is %llu bytes). Are you sure this is what you really want?", server.maxmemory);
     }
 
-    redisSetCpuAffinity(server.server_cpulist);
-    setOOMScoreAdj(-1);
+    redisSetCpuAffinity(server.server_cpulist);     //ldc:根据server.server_cpulist进行绑核.  redis支持CPU绑核, IO 线程(server_cpulist)、bio 线程(bio_cpulist)、aof rewrite(aof_rewrite_cpulist)、bgsave(bgsave_cpulist)
+    setOOMScoreAdj(-1);     //ldc:根据server.oom_score_adj设置OOM的策略
 
-    aeMain(server.el);
-    aeDeleteEventLoop(server.el);
+    aeMain(server.el);      //ldc:进入ae循环
+    aeDeleteEventLoop(server.el);       //ldc:释放el对象内存
     return 0;
 }
 

@@ -179,7 +179,7 @@ static inline int connSetWriteHandler(connection *conn, ConnectionCallbackFunc f
 /* Register a read handler, to be called when the connection is readable.
  * If NULL, the existing handler is removed.
  */
-static inline int connSetReadHandler(connection *conn, ConnectionCallbackFunc func) {
+static inline int connSetReadHandler(connection *conn, ConnectionCallbackFunc func) {       //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
     return conn->type->set_read_handler(conn, func);
 }
 

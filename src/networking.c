@@ -88,7 +88,7 @@ int listMatchObjects(void *a, void *b) {
 
 /* This function links the client to the global linked list of clients.
  * unlinkClient() does the opposite, among other things. */
-void linkClient(client *c) {
+void linkClient(client *c) {        //ldc:把client添加到server.clients列表
     listAddNodeTail(server.clients,c);
     /* Note that we remember the linked list node where the client is stored,
      * this way removing the client in unlinkClient() will not require
@@ -117,7 +117,7 @@ int authRequired(client *c) {
     return auth_required;
 }
 
-client *createClient(connection *conn) {
+client *createClient(connection *conn) {        //ldc:1、conn->read_handler=func=readQueryFromClient=eventLoop->events[fd].rfileProc=eventLoop->events[fd].wfileProc 2、从epoll到client的关系:eventLoop->events[fd].clientData=conn,conn->private_data = client,client->conn = conn 3、把client添加到server.clients列表
     client *c = zmalloc(sizeof(client));
 
     /* passing NULL as conn it is possible to create a non connected client.
@@ -128,16 +128,16 @@ client *createClient(connection *conn) {
         connEnableTcpNoDelay(conn);
         if (server.tcpkeepalive)
             connKeepAlive(conn,server.tcpkeepalive);
-        connSetReadHandler(conn, readQueryFromClient);
-        connSetPrivateData(conn, c);
+        connSetReadHandler(conn, readQueryFromClient);      //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
+        connSetPrivateData(conn, c);       //ldc:conn->private_data = client  (从epoll到client的关系:eventLoop->events[fd].clientData=conn,其中conn->private_data = client)
     }
-    c->buf = zmalloc(PROTO_REPLY_CHUNK_BYTES);
-    selectDb(c,0);
+    c->buf = zmalloc(PROTO_REPLY_CHUNK_BYTES);      //ldc:client的output buffer默认16k
+    selectDb(c,0);      //ldc:默认使用db0
     uint64_t client_id;
-    atomicGetIncr(server.next_client_id, client_id, 1);
+    atomicGetIncr(server.next_client_id, client_id, 1);     //ldc:cliend的id全局递增
     c->id = client_id;
     c->resp = 2;
-    c->conn = conn;
+    c->conn = conn;     //ldc:conn->private_data = client,client->conn = conn
     c->name = NULL;
     c->bufpos = 0;
     c->buf_usable_size = zmalloc_usable_size(c->buf);
@@ -163,7 +163,7 @@ client *createClient(connection *conn) {
     c->flags = 0;
     c->slot = -1;
     c->ctime = c->lastinteraction = server.unixtime;
-    clientSetDefaultAuth(c);
+    clientSetDefaultAuth(c);        //ldc:初始化client的授权状态
     c->replstate = REPL_STATE_NONE;
     c->repl_start_cmd_stream_on_ack = 0;
     c->reploff = 0;
@@ -212,8 +212,8 @@ client *createClient(connection *conn) {
     listSetMatchMethod(c->pubsub_patterns,listMatchObjects);
     c->mem_usage_bucket = NULL;
     c->mem_usage_bucket_node = NULL;
-    if (conn) linkClient(c);
-    initClientMultiState(c);
+    if (conn) linkClient(c);        //ldc:把client添加到server.clients列表
+    initClientMultiState(c);        //ldc:Client state initialization for MULTI/EXEC
     return c;
 }
 
@@ -1299,7 +1299,7 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
      * Admission control will happen before a client is created and connAccept()
      * called, because we don't want to even start transport-level negotiation
      * if rejected. */
-    if (listLength(server.clients) + getClusterConnectionsCount()
+    if (listLength(server.clients) + getClusterConnectionsCount()       //ldc:连接的客户端=server.clients+cluster节点数
         >= server.maxclients)
     {
         char *err;
@@ -1321,7 +1321,7 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
     }
 
     /* Create connection and client */
-    if ((c = createClient(conn)) == NULL) {
+    if ((c = createClient(conn)) == NULL) {        //ldc:1、conn->read_handler=func=readQueryFromClient=eventLoop->events[fd].rfileProc=eventLoop->events[fd].wfileProc 2、从epoll到client的关系:eventLoop->events[fd].clientData=conn,conn->private_data = client,client->conn = conn 3、把client添加到server.clients列表
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (conn: %s)",
             connGetLastError(conn),
@@ -1352,14 +1352,14 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
     }
 }
 
-void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
+void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {      //ldc:接受新的TCP连接
     int cport, cfd, max = MAX_ACCEPTS_PER_CALL;
     char cip[NET_IP_STR_LEN];
     UNUSED(el);
     UNUSED(mask);
     UNUSED(privdata);
 
-    while(max--) {
+    while(max--) {      //ldc:一次只处理MAX_ACCEPTS_PER_CALL=1000个连接
         cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
@@ -1368,7 +1368,7 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
             return;
         }
         serverLog(LL_VERBOSE,"Accepted %s:%d", cip, cport);
-        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip);
+        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip);       //ldc: connCreateAcceptedSocket(cfd):创建socket-type connection,需要connAccept()才允许I/O
     }
 }
 

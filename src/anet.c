@@ -507,13 +507,13 @@ int anetUnixServer(char *err, char *path, mode_t perm, int backlog)
 
 /* Accept a connection and also make sure the socket is non-blocking, and CLOEXEC.
  * returns the new socket FD, or -1 on error. */
-static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {
+static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *len) {       //ldc:接受新的连接,创建新的socket,返回fd
     int fd;
     do {
         /* Use the accept4() call on linux to simultaneously accept and
          * set a socket as non-blocking. */
 #ifdef HAVE_ACCEPT4
-        fd = accept4(s, sa, len,  SOCK_NONBLOCK | SOCK_CLOEXEC);
+        fd = accept4(s, sa, len,  SOCK_NONBLOCK | SOCK_CLOEXEC);        //ldc:接受新的连接,创建新的fd
 #else
         fd = accept(s,sa,len);
 #endif
@@ -538,11 +538,11 @@ static int anetGenericAccept(char *err, int s, struct sockaddr *sa, socklen_t *l
 
 /* Accept a connection and also make sure the socket is non-blocking, and CLOEXEC.
  * returns the new socket FD, or -1 on error. */
-int anetTcpAccept(char *err, int serversock, char *ip, size_t ip_len, int *port) {
+int anetTcpAccept(char *err, int serversock, char *ip, size_t ip_len, int *port) {      //ldc:接受新的连接,创建新的socket,返回fd
     int fd;
     struct sockaddr_storage sa;
     socklen_t salen = sizeof(sa);
-    if ((fd = anetGenericAccept(err,serversock,(struct sockaddr*)&sa,&salen)) == ANET_ERR)
+    if ((fd = anetGenericAccept(err,serversock,(struct sockaddr*)&sa,&salen)) == ANET_ERR)      //ldc:接受新的连接,创建新的socket,返回fd
         return ANET_ERR;
 
     if (sa.ss_family == AF_INET) {

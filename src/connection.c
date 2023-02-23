@@ -92,8 +92,8 @@ connection *connCreateSocket() {
  * is not in an error state (which is not possible for a socket connection,
  * but could but possible with other protocols).
  */
-connection *connCreateAcceptedSocket(int fd) {
-    connection *conn = connCreateSocket();
+connection *connCreateAcceptedSocket(int fd) {      //ldc:创建socket-type connection,需要connAccept()才允许I/O
+    connection *conn = connCreateSocket();      //ldc:申请conn空间,赋值 conn->type = &CT_Socket,  conn->fd = -1 返回conn
     conn->fd = fd;
     conn->state = CONN_STATE_ACCEPTING;
     return conn;
@@ -250,14 +250,14 @@ static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc fu
 /* Register a read handler, to be called when the connection is readable.
  * If NULL, the existing handler is removed.
  */
-static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {
+static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {        //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
     if (func == conn->read_handler) return C_OK;
 
     conn->read_handler = func;
     if (!conn->read_handler)
         aeDeleteFileEvent(server.el,conn->fd,AE_READABLE);
     else
-        if (aeCreateFileEvent(server.el,conn->fd,
+        if (aeCreateFileEvent(server.el,conn->fd,       //ldc:1、使用epoll_ctl添加监听新事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
                     AE_READABLE,conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
     return C_OK;
 }

@@ -155,7 +155,7 @@ void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
 
-int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
+int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,     //ldc:1、使用epoll_ctl添加监听新事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData进行赋值
         aeFileProc *proc, void *clientData)
 {
     if (fd >= eventLoop->setsize) {
@@ -164,9 +164,9 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
     }
     aeFileEvent *fe = &eventLoop->events[fd];
 
-    if (aeApiAddEvent(eventLoop, fd, mask) == -1)
+    if (aeApiAddEvent(eventLoop, fd, mask) == -1)        //ldc:使用epoll_ctl添加监听新事件
         return AE_ERR;
-    fe->mask |= mask;
+    fe->mask |= mask;       //ldc:对eventLoop->events[fd]的mask、rfileProc、wfileProc、clientData进行赋值
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     fe->clientData = clientData;
@@ -365,14 +365,14 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
      * file events to process as long as we want to process time
      * events, in order to sleep until the next time event is ready
      * to fire. */
-    if (eventLoop->maxfd != -1 ||
+    if (eventLoop->maxfd != -1 ||       //ldc:每次新客户端连接进来,则eventLoop->maxfd增1(启动完成时eventLoop->maxfd为9,其中8、9为TPC监听连接)
         ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT))) {
         int j;
         struct timeval tv, *tvp;
         int64_t usUntilTimer = -1;
 
         if (flags & AE_TIME_EVENTS && !(flags & AE_DONT_WAIT))
-            usUntilTimer = usUntilEarliestTimer(eventLoop);
+            usUntilTimer = usUntilEarliestTimer(eventLoop);     //ldc:循环eventLoop->timeEventHead列表,获取最近的定时器间隔(microseconds)
 
         if (usUntilTimer >= 0) {
             tv.tv_sec = usUntilTimer / 1000000;
@@ -397,17 +397,17 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         }
 
         if (eventLoop->beforesleep != NULL && flags & AE_CALL_BEFORE_SLEEP)
-            eventLoop->beforesleep(eventLoop);
+            eventLoop->beforesleep(eventLoop);      //ldc:获取epoll_event集合前执行beforesleep
 
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
-        numevents = aeApiPoll(eventLoop, tvp);
+        numevents = aeApiPoll(eventLoop, tvp);      //ldc:通过epoll_wait获取epoll_event集合,然后封装到eventLoop->fired
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
-            eventLoop->aftersleep(eventLoop);
+            eventLoop->aftersleep(eventLoop);       //ldc:获取epoll_event集合后执行aftersleep
 
-        for (j = 0; j < numevents; j++) {
+        for (j = 0; j < numevents; j++) {       //ldc:循环处理epoll_event集合
             int fd = eventLoop->fired[j].fd;
             aeFileEvent *fe = &eventLoop->events[fd];
             int mask = eventLoop->fired[j].mask;
@@ -433,7 +433,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
              * Fire the readable event if the call sequence is not
              * inverted. */
             if (!invert && fe->mask & mask & AE_READABLE) {
-                fe->rfileProc(eventLoop,fd,fe->clientData,mask);
+                fe->rfileProc(eventLoop,fd,fe->clientData,mask);        //ldc:eventLoop->fired[j].fd为8、9时rfileProc对应acceptTcpHandler,其它TCP连接数值时对应connSocketEventHandler
                 fired++;
                 fe = &eventLoop->events[fd]; /* Refresh in case of resize. */
             }

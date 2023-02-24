@@ -145,7 +145,7 @@ void *connGetPrivateData(connection *conn) {
  */
 
 /* Close the connection and free resources. */
-static void connSocketClose(connection *conn) {
+static void connSocketClose(connection *conn) {     //ldc:上层有一个wrapper函数 connClose,提供给用户使用
     if (conn->fd != -1) {
         aeDeleteFileEvent(server.el,conn->fd, AE_READABLE | AE_WRITABLE);
         close(conn->fd);
@@ -155,7 +155,7 @@ static void connSocketClose(connection *conn) {
     /* If called from within a handler, schedule the close but
      * keep the connection until the handler returns.
      */
-    if (connHasRefs(conn)) {
+    if (connHasRefs(conn)) {        //ldc:控制连接对象生命周期的引用计数conn->refs。如果此时引用计数不为0,说明是处于某个回调函数中,此时不能直接关闭,设置标志位 CONN_FLAG_CLOSE_SCHEDULED,需要延迟关闭
         conn->flags |= CONN_FLAG_CLOSE_SCHEDULED;
         return;
     }
@@ -163,9 +163,9 @@ static void connSocketClose(connection *conn) {
     zfree(conn);
 }
 
-static int connSocketWrite(connection *conn, const void *data, size_t data_len) {
+static int connSocketWrite(connection *conn, const void *data, size_t data_len) {       //ldc:connSocketWrite 函数上层是被connWrite函数调用。用户无法直接调用 connSocketWrite,只能通过conn对象来调用
     int ret = write(conn->fd, data, data_len);
-    if (ret < 0 && errno != EAGAIN) {
+    if (ret < 0 && errno != EAGAIN) {       //ldc:ret ==-1 && errno ==EAGAIN,在非阻塞IO是正常下的,不是错误
         conn->last_errno = errno;
 
         /* Don't overwrite the state of a connection that is not already
@@ -193,11 +193,11 @@ static int connSocketWritev(connection *conn, const struct iovec *iov, int iovcn
     return ret;
 }
 
-static int connSocketRead(connection *conn, void *buf, size_t buf_len) {
+static int connSocketRead(connection *conn, void *buf, size_t buf_len) {        //ldc:connSocketRead 经过封装被 connRead调用,将数据读取到到buf中。用户不应该直接调用 connSocketRead
     int ret = read(conn->fd, buf, buf_len);
     if (!ret) {
         conn->state = CONN_STATE_CLOSED;
-    } else if (ret < 0 && errno != EAGAIN) {
+    } else if (ret < 0 && errno != EAGAIN) {        //ldc:ret ==-1 && errno ==EAGAIN,在非阻塞IO是正常下的,不是错误
         conn->last_errno = errno;
 
         /* Don't overwrite the state of a connection that is not already
@@ -214,10 +214,10 @@ static int connSocketAccept(connection *conn, ConnectionCallbackFunc accept_hand
     int ret = C_OK;
 
     if (conn->state != CONN_STATE_ACCEPTING) return C_ERR;
-    conn->state = CONN_STATE_CONNECTED;
+    conn->state = CONN_STATE_CONNECTED;     //ldc:连接状态转换为CONN_STATE_CONNECTED
 
     connIncrRefs(conn);
-    if (!callHandler(conn, accept_handler)) ret = C_ERR;
+    if (!callHandler(conn, accept_handler)) ret = C_ERR;        //ldc:调用回调函数 accept_handler=clientAcceptHandler
     connDecrRefs(conn);
 
     return ret;
@@ -230,26 +230,26 @@ static int connSocketAccept(connection *conn, ConnectionCallbackFunc accept_hand
  * CONN_FLAG_WRITE_BARRIER set. This will ensure that the write handler is
  * always called before and not after the read handler in a single event
  * loop.
- */
-static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc func, int barrier) {
+ */     //ldc:根据函数 connSocketSetWriteHandler 的第三个标志位barrier,可封装成两个函数给用户使用 connSetWriteHandler、connSetWriteHandlerWithBarrier
+static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc func, int barrier) {      //ldc:主要是在epoll_wait上注册可写事件,并设置可写事件的回调函数为 ae_handler,真正执行写操作的还是func.  设置连接对象conn的写回调函数 conn->write_handler 为 func,再注册写事件,如果设置的回调函数 func为NULL,则取消注册可写事件  注意：这里注册的可写事件的回调函数是ae_handler,是因为在ae_handler中,综合处理了可读、可写事件
     if (func == conn->write_handler) return C_OK;
 
-    conn->write_handler = func;
+    conn->write_handler = func;     //ldc:设置新的可写事件处理函数
     if (barrier)
         conn->flags |= CONN_FLAG_WRITE_BARRIER;
     else
         conn->flags &= ~CONN_FLAG_WRITE_BARRIER;
-    if (!conn->write_handler)
+    if (!conn->write_handler)       //ldc:如果没有设置可写事件处理函数,则取消关注可写事件
         aeDeleteFileEvent(server.el,conn->fd,AE_WRITABLE);
     else
-        if (aeCreateFileEvent(server.el,conn->fd,AE_WRITABLE,
+        if (aeCreateFileEvent(server.el,conn->fd,AE_WRITABLE,       //ldc:关注可写事件
                     conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
     return C_OK;
 }
 
 /* Register a read handler, to be called when the connection is readable.
  * If NULL, the existing handler is removed.
- */
+ */     //ldc:主要是注册可读事件,并设置读回调函数为 ae_handler,真正执行读取操作的还是func.     函数上层是被connSetReadHandler,用户无法直接调用
 static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {        //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
     if (func == conn->read_handler) return C_OK;
 
@@ -266,13 +266,13 @@ static const char *connSocketGetLastError(connection *conn) {
     return strerror(conn->last_errno);
 }
 
-static void connSocketEventHandler(struct aeEventLoop *el, int fd, void *clientData, int mask)
+static void connSocketEventHandler(struct aeEventLoop *el, int fd, void *clientData, int mask)      //ldc:处理epllfd上可读可写事件
 {
     UNUSED(el);
     UNUSED(fd);
     connection *conn = clientData;
 
-    if (conn->state == CONN_STATE_CONNECTING &&
+    if (conn->state == CONN_STATE_CONNECTING &&     //ldc:针对发起连接对象
             (mask & AE_WRITABLE) && conn->conn_handler) {
 
         int conn_error = connGetSocketError(conn);
@@ -282,24 +282,24 @@ static void connSocketEventHandler(struct aeEventLoop *el, int fd, void *clientD
         } else {
             conn->state = CONN_STATE_CONNECTED;
         }
+    
+        if (!conn->write_handler) aeDeleteFileEvent(server.el,conn->fd,AE_WRITABLE);        //ldc:如果没有设置可写事件的处理函数,则直接取消可写事件
 
-        if (!conn->write_handler) aeDeleteFileEvent(server.el,conn->fd,AE_WRITABLE);
-
-        if (!callHandler(conn, conn->conn_handler)) return;
+        if (!callHandler(conn, conn->conn_handler)) return;     //ldc:处理新连接到来
         conn->conn_handler = NULL;
     }
 
     /* Normally we execute the readable event first, and the writable
      * event later. This is useful as sometimes we may be able
      * to serve the reply of a query immediately after processing the
-     * query.
+     * query.       //ldc:通常我们先执行可读事件,然后执行可写事件,这种方式很有用,因为有时我们可以在处理查询之后立即提供查询的结果
      *
      * However if WRITE_BARRIER is set in the mask, our application is
      * asking us to do the reverse: never fire the writable event
-     * after the readable. In such a case, we invert the calls.
+     * after the readable. In such a case, we invert the calls.     //ldc:如果设置了 WRITE_BARRIER, 那么处理程序就反过来:在处理了可读事件之后都不触发可写事件
      * This is useful when, for instance, we want to do things
      * in the beforeSleep() hook, like fsync'ing a file to disk,
-     * before replying to a client. */
+     * before replying to a client. */      //ldc:这种操作很有用,比如,当我在beforeSleep()函数中,执行一些阻塞操作,类似fsync操作
     int invert = conn->flags & CONN_FLAG_WRITE_BARRIER;
 
     int call_write = (mask & AE_WRITABLE) && conn->write_handler;
@@ -360,16 +360,16 @@ static int connSocketGetType(connection *conn) {
     return CONN_TYPE_SOCKET;
 }
 
-ConnectionType CT_Socket = {
-    .ae_handler = connSocketEventHandler,
-    .close = connSocketClose,
-    .write = connSocketWrite,
+ConnectionType CT_Socket = {        //ldc:这个结构是核心，后续的各种网络操作，都是通过ConnectionType中的指针调用的
+    .ae_handler = connSocketEventHandler,       //ldc:主要是综合处理可读、可写事件
+    .close = connSocketClose,       //ldc:关闭客户端操作
+    .write = connSocketWrite,       //ldc:这是REdis中实际完成写操作的最底层的函数,调用write函数完成发送
     .writev = connSocketWritev,
-    .read = connSocketRead,
+    .read = connSocketRead,     //ldc:和写操作类似,这是最底层的函数,服务器读取客户端发来的数据
     .accept = connSocketAccept,
     .connect = connSocketConnect,
-    .set_write_handler = connSocketSetWriteHandler,
-    .set_read_handler = connSocketSetReadHandler,
+    .set_write_handler = connSocketSetWriteHandler,     //ldc:主要是在epoll_wait上注册可写事件,并设置可写事件的回调函数为 ae_handler,真正执行写操作的还是func.  func:1、设置连接对象conn的写回调函数 conn->write_handler 为 func,再注册写事件 2、如果设置的回调函数 func为NULL,则取消注册可写事件
+    .set_read_handler = connSocketSetReadHandler,       //ldc:主要是注册可读事件,并设置读回调函数为 ae_handler,真正执行读取操作的还是func
     .get_last_error = connSocketGetLastError,
     .blocking_connect = connSocketBlockingConnect,
     .sync_write = connSocketSyncWrite,
@@ -424,9 +424,9 @@ int connDisableTcpNoDelay(connection *conn) {
     return anetDisableTcpNoDelay(NULL, conn->fd);
 }
 
-int connKeepAlive(connection *conn, int interval) {
+int connKeepAlive(connection *conn, int interval) {      //ldc:每个客户端设置心跳检测,通过三个选项TCP_KEEPIDLE、TCP_KEEPINTVL、TCP_KEEPCNT，改变了keeplive的默认值
     if (conn->fd == -1) return C_ERR;
-    return anetKeepAlive(NULL, conn->fd, interval);
+    return anetKeepAlive(NULL, conn->fd, interval);      //ldc:每个客户端设置心跳检测,通过三个选项TCP_KEEPIDLE、TCP_KEEPINTVL、TCP_KEEPCNT，改变了keeplive的默认值
 }
 
 int connSendTimeout(connection *conn, long long ms) {

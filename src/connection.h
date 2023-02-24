@@ -41,11 +41,11 @@ typedef struct connection connection;
 
 typedef enum {
     CONN_STATE_NONE = 0,
-    CONN_STATE_CONNECTING,
-    CONN_STATE_ACCEPTING,
-    CONN_STATE_CONNECTED,
-    CONN_STATE_CLOSED,
-    CONN_STATE_ERROR
+    CONN_STATE_CONNECTING,        //ldc:发起 connect 连接时
+    CONN_STATE_ACCEPTING,        //ldc:创建客户端时初始状态，即 accept 之前的状态
+    CONN_STATE_CONNECTED,        //ldc:成功 accept 之后的状态
+    CONN_STATE_CLOSED,        //ldc:关闭的状态
+    CONN_STATE_ERROR        //ldc:出错了
 } ConnectionState;
 
 #define CONN_FLAG_CLOSE_SCHEDULED   (1<<0)      /* Closed scheduled by a handler */
@@ -56,35 +56,35 @@ typedef enum {
 
 typedef void (*ConnectionCallbackFunc)(struct connection *conn);
 
-typedef struct ConnectionType {
-    void (*ae_handler)(struct aeEventLoop *el, int fd, void *clientData, int mask);
-    int (*connect)(struct connection *conn, const char *addr, int port, const char *source_addr, ConnectionCallbackFunc connect_handler);
-    int (*write)(struct connection *conn, const void *data, size_t data_len);
-    int (*writev)(struct connection *conn, const struct iovec *iov, int iovcnt);
-    int (*read)(struct connection *conn, void *buf, size_t buf_len);
-    void (*close)(struct connection *conn);
-    int (*accept)(struct connection *conn, ConnectionCallbackFunc accept_handler);
-    int (*set_write_handler)(struct connection *conn, ConnectionCallbackFunc handler, int barrier);
-    int (*set_read_handler)(struct connection *conn, ConnectionCallbackFunc handler);
-    const char *(*get_last_error)(struct connection *conn);
-    int (*blocking_connect)(struct connection *conn, const char *addr, int port, long long timeout);
-    ssize_t (*sync_write)(struct connection *conn, char *ptr, ssize_t size, long long timeout);
-    ssize_t (*sync_read)(struct connection *conn, char *ptr, ssize_t size, long long timeout);
-    ssize_t (*sync_readline)(struct connection *conn, char *ptr, ssize_t size, long long timeout);
+typedef struct ConnectionType {     //ldc:封装了客户端连接对象的一些读写、Accept和关闭连接等操作，是函数指针的结构体
+    void (*ae_handler)(struct aeEventLoop *el, int fd, void *clientData, int mask);     //ldc:读写
+    int (*connect)(struct connection *conn, const char *addr, int port, const char *source_addr, ConnectionCallbackFunc connect_handler);       //ldc:处理连接请求
+    int (*write)(struct connection *conn, const void *data, size_t data_len);       //ldc:写
+    int (*writev)(struct connection *conn, const struct iovec *iov, int iovcnt);       //ldc:写
+    int (*read)(struct connection *conn, void *buf, size_t buf_len);       //ldc:读
+    void (*close)(struct connection *conn);       //ldc:关闭
+    int (*accept)(struct connection *conn, ConnectionCallbackFunc accept_handler);       //ldc:连接
+    int (*set_write_handler)(struct connection *conn, ConnectionCallbackFunc handler, int barrier);       //ldc:设置write handler
+    int (*set_read_handler)(struct connection *conn, ConnectionCallbackFunc handler);      //ldc:设置read handler
+    const char *(*get_last_error)(struct connection *conn);     //ldc:获取最后一次错误
+    int (*blocking_connect)(struct connection *conn, const char *addr, int port, long long timeout);        //ldc:阻塞连接
+    ssize_t (*sync_write)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步写
+    ssize_t (*sync_read)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步读
+    ssize_t (*sync_readline)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步读取一行
     int (*get_type)(struct connection *conn);
 } ConnectionType;
 
 struct connection {
-    ConnectionType *type;
-    ConnectionState state;
-    short int flags;
-    short int refs;
-    int last_errno;
-    void *private_data;
-    ConnectionCallbackFunc conn_handler;
-    ConnectionCallbackFunc write_handler;
-    ConnectionCallbackFunc read_handler;
-    int fd;
+    ConnectionType *type;       //ldc:操作 connection 中的函数指针
+    ConnectionState state;      //ldc:是一个 enum，表示连接的状态
+    short int flags;        //ldc:CONN_FLAG_CLOSE_SCHEDULED 或者 CONN_FLAG_WRITE_BARRIER
+    short int refs;     //ldc:引用计数，控制着这个连接对象生命周期
+    int last_errno;     //ldc:最近一次的错误类型
+    void *private_data;     //ldc:保存的是这个连接对应的客户端 client
+    ConnectionCallbackFunc conn_handler;        //ldc:连接回调
+    ConnectionCallbackFunc write_handler;       //ldc:写回调
+    ConnectionCallbackFunc read_handler;        //ldc:读回调
+    int fd;     //ldc:cfd
 };
 
 /* The connection module does not deal with listening and accepting sockets,
@@ -106,7 +106,7 @@ struct connection {
  */
 
 static inline int connAccept(connection *conn, ConnectionCallbackFunc accept_handler) {
-    return conn->type->accept(conn, accept_handler);
+    return conn->type->accept(conn, accept_handler);        //ldc:实际上调用的回调函数是 connSocketAccept,主要完成两个任务:1、将conn的状态从CONN_STATE_ACCEPTING转变为CONN_STATE_CONNECTED 2、在callHandler中调用accept_handler函数，此处即 clientAcceptHandler，校验conn状态
 }
 
 /* Establish a connection.  The connect_handler will be called when the connection

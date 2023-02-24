@@ -125,10 +125,10 @@ client *createClient(connection *conn) {        //ldc:1、conn->read_handler=fun
      * in the context of a client. When commands are executed in other
      * contexts (for instance a Lua script) we need a non connected client. */
     if (conn) {
-        connEnableTcpNoDelay(conn);
-        if (server.tcpkeepalive)
-            connKeepAlive(conn,server.tcpkeepalive);
-        connSetReadHandler(conn, readQueryFromClient);      //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
+        connEnableTcpNoDelay(conn);     //ldc:开启 nagle
+        if (server.tcpkeepalive)        //ldc:心跳检测
+            connKeepAlive(conn,server.tcpkeepalive);        //ldc:底层调用的是 anetKeepAlive实现.   每个客户端设置心跳检测,通过三个选项TCP_KEEPIDLE、TCP_KEEPINTVL、TCP_KEEPCNT，改变了keeplive的默认值
+        connSetReadHandler(conn, readQueryFromClient);      //ldc:注册socket的读事件 1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
         connSetPrivateData(conn, c);       //ldc:conn->private_data = client  (从epoll到client的关系:eventLoop->events[fd].clientData=conn,其中conn->private_data = client)
     }
     c->buf = zmalloc(PROTO_REPLY_CHUNK_BYTES);      //ldc:client的output buffer默认16k
@@ -1225,14 +1225,14 @@ int islocalClient(client *c) {
     return !strcmp(cip,"127.0.0.1") || !strcmp(cip,"::1");
 }
 
-void clientAcceptHandler(connection *conn) {
+void clientAcceptHandler(connection *conn) {       //ldc:主要是用于判断调用connAccept是否顺利，此时的状态conn->state应该是 CONN_STATE_CONNECTED，如果不是则需要关闭客户端、释放相关资源。因此，clientAcceptHandler相当于一个善后校验处理函数
     client *c = connGetPrivateData(conn);
 
     if (connGetState(conn) != CONN_STATE_CONNECTED) {
         serverLog(LL_WARNING,
                 "Error accepting a client connection: %s",
                 connGetLastError(conn));
-        freeClientAsync(c);
+        freeClientAsync(c);     //ldc:异步的
         return;
     }
 
@@ -1240,10 +1240,10 @@ void clientAcceptHandler(connection *conn) {
      * is no password set, nor a specific interface is bound, we don't accept
      * requests from non loopback interfaces. Instead we try to explain the
      * user what to do to fix it if needed. */
-    if (server.protected_mode &&
+    if (server.protected_mode &&        //ldc:默认是Don't accept external connections
         DefaultUser->flags & USER_FLAG_NOPASS)
     {
-        if (!islocalClient(c)) {
+        if (!islocalClient(c)) {        //ldc:如果不是本地客户端
             char *err =
                 "-DENIED Redis is running in protected mode because protected "
                 "mode is enabled and no password is set for the default user. "
@@ -1267,7 +1267,7 @@ void clientAcceptHandler(connection *conn) {
             if (connWrite(c->conn,err,strlen(err)) == -1) {
                 /* Nothing to do, Just to avoid the warning... */
             }
-            server.stat_rejected_conn++;
+            server.stat_rejected_conn++;        //ldc:仅调试信息
             freeClientAsync(c);
             return;
         }
@@ -1280,12 +1280,12 @@ void clientAcceptHandler(connection *conn) {
 }
 
 #define MAX_ACCEPTS_PER_CALL 1000
-static void acceptCommonHandler(connection *conn, int flags, char *ip) {
+static void acceptCommonHandler(connection *conn, int flags, char *ip) {        //ldc:主要查看accept所得的客户端是否合理，满足各个条件，最终创建客户端
     client *c;
     char conninfo[100];
     UNUSED(ip);
 
-    if (connGetState(conn) != CONN_STATE_ACCEPTING) {
+    if (connGetState(conn) != CONN_STATE_ACCEPTING) {       //ldc:要求conn的状态是CONN_STATE_ACCEPTING
         serverLog(LL_VERBOSE,
             "Accepted client connection in error state: %s (conn: %s)",
             connGetLastError(conn),
@@ -1299,7 +1299,7 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
      * Admission control will happen before a client is created and connAccept()
      * called, because we don't want to even start transport-level negotiation
      * if rejected. */
-    if (listLength(server.clients) + getClusterConnectionsCount()       //ldc:连接的客户端=server.clients+cluster节点数
+    if (listLength(server.clients) + getClusterConnectionsCount()       //ldc:连接的客户端个数=server.clients+cluster节点数
         >= server.maxclients)
     {
         char *err;
@@ -1312,16 +1312,16 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
         /* That's a best effort error message, don't check write errors.
          * Note that for TLS connections, no handshake was done yet so nothing
          * is written and the connection will just drop. */
-        if (connWrite(conn,err,strlen(err)) == -1) {
+        if (connWrite(conn,err,strlen(err)) == -1) {        //ldc:发送给客户端错误信息
             /* Nothing to do, Just to avoid the warning... */
         }
-        server.stat_rejected_conn++;
-        connClose(conn);
+        server.stat_rejected_conn++;        //ldc:用于调试信息
+        connClose(conn);        //ldc:关闭客户端
         return;
     }
 
     /* Create connection and client */
-    if ((c = createClient(conn)) == NULL) {        //ldc:1、conn->read_handler=func=readQueryFromClient=eventLoop->events[fd].rfileProc=eventLoop->events[fd].wfileProc 2、从epoll到client的关系:eventLoop->events[fd].clientData=conn,conn->private_data = client,client->conn = conn 3、把client添加到server.clients列表
+    if ((c = createClient(conn)) == NULL) {        //ldc:初始化客户端相关数据结构以及对应的socket 1、conn->read_handler=func=readQueryFromClient=eventLoop->events[fd].rfileProc=eventLoop->events[fd].wfileProc 2、从epoll到client的关系:eventLoop->events[fd].clientData=conn,conn->private_data = client,client->conn = conn 3、把client添加到server.clients列表
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (conn: %s)",
             connGetLastError(conn),
@@ -1341,13 +1341,13 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
      *
      * Because of that, we must do nothing else afterwards.
      */
-    if (connAccept(conn, clientAcceptHandler) == C_ERR) {
+    if (connAccept(conn, clientAcceptHandler) == C_ERR) {       //ldc:connAccept 主要是调用函数 clientAcceptHandler 对获得的客户端状态进行判断
         char conninfo[100];
         if (connGetState(conn) == CONN_STATE_ERROR)
             serverLog(LL_WARNING,
                     "Error accepting a client connection: %s (conn: %s)",
                     connGetLastError(conn), connGetInfo(conn, conninfo, sizeof(conninfo)));
-        freeClient(connGetPrivateData(conn));
+        freeClient(connGetPrivateData(conn));       //ldc:同步关闭
         return;
     }
 }
@@ -1359,8 +1359,8 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {      
     UNUSED(mask);
     UNUSED(privdata);
 
-    while(max--) {      //ldc:一次只处理MAX_ACCEPTS_PER_CALL=1000个连接
-        cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
+    while(max--) {      //ldc:为了防止短时间内过多的客户端连接请求,造成阻塞,每次事件循环最多可以处理MAX_ACCEPTS_PER_CALL=1000个客户端的连接
+        cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);       //ldc:当这个函数被调用时(对应的监听socket的读事件发生),已经有客户端完成三次握手建立连接. 函数anetTcpAccept用于accept客户端的连接.
         if (cfd == ANET_ERR) {
             if (errno != EWOULDBLOCK)
                 serverLog(LL_WARNING,
@@ -1368,7 +1368,7 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {      
             return;
         }
         serverLog(LL_VERBOSE,"Accepted %s:%d", cip, cport);
-        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip);       //ldc: connCreateAcceptedSocket(cfd):创建socket-type connection,需要connAccept()才允许I/O
+        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip);       //ldc: connCreateAcceptedSocket(cfd):创建socket-type connection,需要connAccept()才允许I/O. 设置conn->fd为客户端cfd、将conn对象的状态初始化为 CONN_STATE_ACCEPTING、
     }
 }
 

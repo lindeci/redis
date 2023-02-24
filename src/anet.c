@@ -123,7 +123,7 @@ int anetCloexec(int fd) {
 /* Set TCP keep alive option to detect dead peers. The interval option
  * is only used for Linux as we are using Linux-specific APIs to set
  * the probe send time, interval, and count. */
-int anetKeepAlive(char *err, int fd, int interval)
+int anetKeepAlive(char *err, int fd, int interval)      //ldc:每个客户端设置心跳检测,通过三个选项TCP_KEEPIDLE、TCP_KEEPINTVL、TCP_KEEPCNT，改变了keeplive的默认值
 {
     int val = 1;
 

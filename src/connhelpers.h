@@ -76,7 +76,7 @@ static inline int connHasRefs(connection *conn) {
  */
 static inline int callHandler(connection *conn, ConnectionCallbackFunc handler) {       //ldc:只是一个辅助函数，用于调用回调函数 handler.   conn的生命周期，因为这里是依靠引用计数维持conn的生命周期，因此每次在将conn作为参数时，都需要调用一次 connIncrRefs(conn);来增加引用，防止在 回调函数 handler中 conn被释放。比如 handler中又包含了一个 callHandler，那么没有这个增加引用计数，则潜藏着在第二个 callHandler中 conn就会关闭，导致返回到第一个 callHandler中时conn就失效了
     connIncrRefs(conn);
-    if (handler) handler(conn);     //ldc:调用回调函数clientAcceptHandler
+    if (handler) handler(conn);     //ldc:连接时调用回调函数clientAcceptHandler,普通操作时调用readQueryFromClient
     connDecrRefs(conn);
     if (conn->flags & CONN_FLAG_CLOSE_SCHEDULED) {
         if (!connHasRefs(conn)) connClose(conn);        //ldc:如果客户端conn没有引用了,则直接关闭客户端.  注意:整个代码中，只有两处有判断条件 if (!connHasRefs(conn)) ：函数 connClose 和 callHandler，最后也肯定是在 callHandler 下面if 中关闭的

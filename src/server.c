@@ -1585,7 +1585,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
     handleBlockedClientsTimeout();
 
     /* We should handle pending reads clients ASAP after event loop. */
-    handleClientsWithPendingReadsUsingThreads();
+    handleClientsWithPendingReadsUsingThreads();        //ldc:1、遍历待读取的 client 队列 clients_pending_read，通过 RR 策略把所有任务分配给 I/O 线程和主线程去读取和解析客户端命令;2、忙轮询等待所有 I/O 线程完成任务;3、最后再遍历 clients_pending_read，执行所有 client 的命令
 
     /* Handle TLS pending data. (must be done before flushAppendOnlyFile) */
     tlsProcessPendingData();
@@ -1666,7 +1666,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
         flushAppendOnlyFile(0);
 
     /* Handle writes with pending output buffers. */
-    handleClientsWithPendingWritesUsingThreads();
+    handleClientsWithPendingWritesUsingThreads();       //ldc:写回响应
 
     /* Close clients that need to be closed asynchronous */
     freeClientsInAsyncFreeQueue();
@@ -3028,7 +3028,7 @@ struct redisCommand *lookupSubcommand(struct redisCommand *container, sds sub_na
  * name (e.g. in COMMAND INFO) rather than to find the command
  * a user requested to execute (in processCommand).
  */
-struct redisCommand *lookupCommandLogic(dict *commands, robj **argv, int argc, int strict) {
+struct redisCommand *lookupCommandLogic(dict *commands, robj **argv, int argc, int strict) {        //ldc:根据argv and argc查找命令,如果没子命令则直接返回base_cmd
     struct redisCommand *base_cmd = dictFetchValue(commands, argv[0]->ptr);
     int has_subcommands = base_cmd && base_cmd->subcommands_dict;
     if (argc == 1 || !has_subcommands) {
@@ -3160,7 +3160,7 @@ static void propagateNow(int dbid, robj **argv, int argc, int target) {
  * so it is up to the caller to release the passed argv (but it is usually
  * stack allocated).  The function automatically increments ref count of
  * passed objects, so the caller does not need to. */
-void alsoPropagate(int dbid, robj **argv, int argc, int target) {
+void alsoPropagate(int dbid, robj **argv, int argc, int target) {       //ldc:把命令广播到AOF / Replication
     robj **argvcopy;
     int j;
 
@@ -3362,7 +3362,7 @@ void call(client *c, int flags) {
 
     /* Update cache time, in case we have nested calls we want to
      * update only on the first call*/
-    if (server.fixed_time_expire++ == 0) {
+    if (server.fixed_time_expire++ == 0) {      //ldc:server.fixed_time_expire==0时更新cache time
         updateCachedTimeWithUs(0,call_timer);
     }
 
@@ -3371,7 +3371,7 @@ void call(client *c, int flags) {
         monotonic_start = getMonotonicUs();
 
     server.in_nested_call++;
-    c->cmd->proc(c);
+    c->cmd->proc(c);        //ldc:调用cmd的回调函数proc,从dict中查询符合条件的keyobj,添加到client out buffer
     server.in_nested_call--;
 
     /* In order to avoid performance implication due to querying the clock using a system call 3 times,
@@ -3398,7 +3398,7 @@ void call(client *c, int flags) {
 
     /* After executing command, we will close the client after writing entire
      * reply if it is set 'CLIENT_CLOSE_AFTER_COMMAND' flag. */
-    if (c->flags & CLIENT_CLOSE_AFTER_COMMAND) {
+    if (c->flags & CLIENT_CLOSE_AFTER_COMMAND) {        //ldc:如果CLIENT_CLOSE_AFTER_COMMAND,则在写入整个reply后关闭client
         c->flags &= ~CLIENT_CLOSE_AFTER_COMMAND;
         c->flags |= CLIENT_CLOSE_AFTER_REPLY;
     }
@@ -3434,11 +3434,11 @@ void call(client *c, int flags) {
     /* Log the command into the Slow log if needed.
      * If the client is blocked we will handle slowlog when it is unblocked. */
     if ((flags & CMD_CALL_SLOWLOG) && !(c->flags & CLIENT_BLOCKED))
-        slowlogPushCurrentCommand(c, real_cmd, duration);
+        slowlogPushCurrentCommand(c, real_cmd, duration);     //ldc:记录慢日志
 
     /* Send the command to clients in MONITOR mode if applicable.
      * Administrative commands are considered too dangerous to be shown. */
-    if (!(c->cmd->flags & (CMD_SKIP_MONITOR|CMD_ADMIN))) {
+    if (!(c->cmd->flags & (CMD_SKIP_MONITOR|CMD_ADMIN))) {      //ldc:把命令发送给monitor的客户端
         robj **argv = c->original_argv ? c->original_argv : c->argv;
         int argc = c->original_argv ? c->original_argc : c->argc;
         replicationFeedMonitors(c,server.monitors,c->db->id,argv,argc);
@@ -3446,11 +3446,11 @@ void call(client *c, int flags) {
 
     /* Clear the original argv.
      * If the client is blocked we will handle slowlog when it is unblocked. */
-    if (!(c->flags & CLIENT_BLOCKED))
+    if (!(c->flags & CLIENT_BLOCKED))       //ldc:清理client argv
         freeClientOriginalArgv(c);
 
     /* populate the per-command statistics that we show in INFO commandstats. */
-    if (flags & CMD_CALL_STATS) {
+    if (flags & CMD_CALL_STATS) {       //ldc:更新info的统计信息
         real_cmd->microseconds += duration;
         real_cmd->calls++;
         /* If the client is blocked we will handle latency stats when it is unblocked. */
@@ -3471,7 +3471,7 @@ void call(client *c, int flags) {
 
         /* Check if the command operated changes in the data set. If so
          * set for replication / AOF propagation. */
-        if (dirty) propagate_flags |= (PROPAGATE_AOF|PROPAGATE_REPL);
+        if (dirty) propagate_flags |= (PROPAGATE_AOF|PROPAGATE_REPL);       //ldc:检查是否有更新操作
 
         /* If the client forced AOF / replication of the command, set
          * the flags regardless of the command effects on the data set. */
@@ -3491,12 +3491,12 @@ void call(client *c, int flags) {
         /* Call alsoPropagate() only if at least one of AOF / replication
          * propagation is needed. */
         if (propagate_flags != PROPAGATE_NONE)
-            alsoPropagate(c->db->id,c->argv,c->argc,propagate_flags);
+            alsoPropagate(c->db->id,c->argv,c->argc,propagate_flags);       //ldc:把命令广播到AOF / Replication
     }
 
     /* Restore the old replication flags, since call() can be executed
      * recursively. */
-    c->flags &= ~(CLIENT_FORCE_AOF|CLIENT_FORCE_REPL|CLIENT_PREVENT_PROP);
+    c->flags &= ~(CLIENT_FORCE_AOF|CLIENT_FORCE_REPL|CLIENT_PREVENT_PROP);      //ldc:恢复old replication flags
     c->flags |= client_old_flags &
         (CLIENT_FORCE_AOF|CLIENT_FORCE_REPL|CLIENT_PREVENT_PROP);
 
@@ -3526,7 +3526,7 @@ void call(client *c, int flags) {
         server.stat_peak_memory = zmalloc_used;
 
     /* Do some maintenance job and cleanup */
-    afterCommand(c);
+    afterCommand(c);        //ldc:执行命令的末尾维护工作
 
     /* Client pause takes effect after a transaction has finished. This needs
      * to be located after everything is propagated. */
@@ -3577,7 +3577,7 @@ void rejectCommandFormat(client *c, const char *fmt, ...) {
 }
 
 /* This is called after a command in call, we can do some maintenance job in it. */
-void afterCommand(client *c) {
+void afterCommand(client *c) {      //ldc:执行命令的末尾维护工作
     UNUSED(c);
     if (!server.in_nested_call) {
         /* If we are at the top-most call() we can propagate what we accumulated.
@@ -3694,7 +3694,7 @@ int processCommand(client *c) {
 
     /* Now lookup the command and check ASAP about trivial error conditions
      * such as wrong arity, bad command name and so forth. */
-    c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);
+    c->cmd = c->lastcmd = c->realcmd = lookupCommand(c->argv,c->argc);      //ldc:从Commands表格中查找命令
     sds err;
     if (!commandCheckExistence(c, &err)) {
         rejectCommandSds(c, err);
@@ -3736,9 +3736,9 @@ int processCommand(client *c) {
                                    (c->cmd->proc == execCommand && (c->mstate.cmd_flags & (CMD_WRITE | CMD_MAY_REPLICATE)));
     int is_deny_async_loading_command = (cmd_flags & CMD_NO_ASYNC_LOADING) ||
                                         (c->cmd->proc == execCommand && (c->mstate.cmd_flags & CMD_NO_ASYNC_LOADING));
-    int obey_client = mustObeyClient(c);
+    int obey_client = mustObeyClient(c);        //ldc:客户端的黑白名单检查
 
-    if (authRequired(c)) {
+    if (authRequired(c)) {      //ldc:命令的黑白名单检查
         /* AUTH and HELLO and no auth commands are valid even in
          * non-authenticated state. */
         if (!(c->cmd->flags & CMD_NO_AUTH)) {
@@ -3755,7 +3755,7 @@ int processCommand(client *c) {
     /* Check if the user can run this command according to the current
      * ACLs. */
     int acl_errpos;
-    int acl_retval = ACLCheckAllPerm(c,&acl_errpos);
+    int acl_retval = ACLCheckAllPerm(c,&acl_errpos);        //ldc:ACLs检查
     if (acl_retval != ACL_OK) {
         addACLLogEntry(c,acl_retval,(c->flags & CLIENT_MULTI) ? ACL_LOG_CTX_MULTI : ACL_LOG_CTX_TOPLEVEL,acl_errpos,NULL,NULL);
         switch (acl_retval) {
@@ -3787,7 +3787,7 @@ int processCommand(client *c) {
      * However we don't perform the redirection if:
      * 1) The sender of this command is our master.
      * 2) The command has no key arguments. */
-    if (server.cluster_enabled &&
+    if (server.cluster_enabled &&       //ldc:如果是cluster模式，则需要重定向命令到对应的NODE
         !mustObeyClient(c) &&
         !(!(c->cmd->flags&CMD_MOVABLE_KEYS) && c->cmd->key_specs_num == 0 &&
           c->cmd->proc != execCommand))
@@ -3810,7 +3810,7 @@ int processCommand(client *c) {
     /* Disconnect some clients if total clients memory is too high. We do this
      * before key eviction, after the last command was executed and consumed
      * some client output buffer memory. */
-    evictClients();
+    evictClients();     //ldc:如果内存不足,则淘汰一些客户端
     if (server.current_client == NULL) {
         /* If we evicted ourself then abort processing the command */
         return C_ERR;
@@ -3869,7 +3869,7 @@ int processCommand(client *c) {
     /* Don't accept write commands if there are problems persisting on disk
      * unless coming from our master, in which case check the replica ignore
      * disk write error config to either log or crash. */
-    int deny_write_type = writeCommandsDeniedByDiskError();
+    int deny_write_type = writeCommandsDeniedByDiskError();     //ldc:如果硬盘满了,则拒绝写类型的命令
     if (deny_write_type != DISK_ERROR_TYPE_NONE &&
         (is_write_command || c->cmd->proc == pingCommand))
     {
@@ -3896,7 +3896,7 @@ int processCommand(client *c) {
 
     /* Don't accept write commands if there are not enough good slaves and
      * user configured the min-slaves-to-write option. */
-    if (is_write_command && !checkGoodReplicasStatus()) {
+    if (is_write_command && !checkGoodReplicasStatus()) {       //ldc:如果是写类型命令,且没有好的slaves时,则拒绝该命令
         rejectCommand(c, shared.noreplicaserr);
         return C_OK;
     }
@@ -4002,10 +4002,10 @@ int processCommand(client *c) {
         c->cmd->proc != quitCommand &&
         c->cmd->proc != resetCommand)
     {
-        queueMultiCommand(c, cmd_flags);
-        addReply(c,shared.queued);
+        queueMultiCommand(c, cmd_flags);        //ldc:执行命令
+        addReply(c,shared.queued);      //ldc:把client c添加到shared.queued队列
     } else {
-        call(c,CMD_CALL_FULL);
+        call(c,CMD_CALL_FULL);      //ldc:执行命令的业务逻辑
         c->woff = server.master_repl_offset;
         if (listLength(server.ready_keys))
             handleClientsBlockedOnKeys();

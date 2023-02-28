@@ -71,7 +71,7 @@ static void aeApiFree(aeEventLoop *eventLoop) {
     zfree(state);
 }
 
-static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {        //ldc:使用epoll_ctl添加监听新事件
+static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {        //ldc:使用epoll_ctl添加监听fd上的事件
     aeApiState *state = eventLoop->apidata;
     struct epoll_event ee = {0}; /* avoid valgrind warning */
     /* If the fd was already monitored for some event, we need a MOD

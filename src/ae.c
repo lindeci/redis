@@ -155,7 +155,7 @@ void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
 
-int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,     //ldc:1、使用epoll_ctl添加监听新事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData进行赋值
+int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,     //ldc:1、使用epoll_ctl添加监听fd上的事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProcconn->type->ae_handler=connSocketEventHandler、clientData进行赋值
         aeFileProc *proc, void *clientData)
 {
     if (fd >= eventLoop->setsize) {
@@ -164,7 +164,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,     //ldc:1、�
     }
     aeFileEvent *fe = &eventLoop->events[fd];
 
-    if (aeApiAddEvent(eventLoop, fd, mask) == -1)        //ldc:使用epoll_ctl添加监听新事件
+    if (aeApiAddEvent(eventLoop, fd, mask) == -1)        //ldc:使用epoll_ctl添加监听fd上的事件
         return AE_ERR;
     fe->mask |= mask;       //ldc:对eventLoop->events[fd]的mask、rfileProc、wfileProc、clientData进行赋值
     if (mask & AE_READABLE) fe->rfileProc = proc;

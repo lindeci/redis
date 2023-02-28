@@ -735,15 +735,15 @@ void randomkeyCommand(client *c) {
     decrRefCount(key);
 }
 
-void keysCommand(client *c) {
+void keysCommand(client *c) {       //ldc:从dict中查询符合条件的keyobj
     dictIterator *di;
     dictEntry *de;
-    sds pattern = c->argv[1]->ptr;
+    sds pattern = c->argv[1]->ptr;      //ldc:获取命令参数
     int plen = sdslen(pattern), allkeys;
     unsigned long numkeys = 0;
     void *replylen = addReplyDeferredLen(c);
 
-    di = dictGetSafeIterator(c->db->dict);
+    di = dictGetSafeIterator(c->db->dict);      //ldc：获取dict
     allkeys = (pattern[0] == '*' && plen == 1);
     while((de = dictNext(di)) != NULL) {
         sds key = dictGetKey(de);
@@ -752,7 +752,7 @@ void keysCommand(client *c) {
         if (allkeys || stringmatchlen(pattern,plen,key,sdslen(key),0)) {
             keyobj = createStringObject(key,sdslen(key));
             if (!keyIsExpired(c->db,keyobj)) {
-                addReplyBulk(c,keyobj);
+                addReplyBulk(c,keyobj);     //ldc:Add a Redis Object as a bulk reply
                 numkeys++;
             }
             decrRefCount(keyobj);

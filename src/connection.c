@@ -250,14 +250,14 @@ static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc fu
 /* Register a read handler, to be called when the connection is readable.
  * If NULL, the existing handler is removed.
  */     //ldc:主要是注册可读事件,并设置读回调函数为 ae_handler,真正执行读取操作的还是func.     函数上层是被connSetReadHandler,用户无法直接调用
-static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {        //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
+static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc func) {        //ldc:1、conn->read_handler=func=readQueryFromClient,2、使用epoll_ctl添加监听新事件 3、对eventLoop->events[fd]的mask、rfileProc=wfileProc=conn->type->ae_handler=connSocketEventHandler、clientData=conn进行赋值
     if (func == conn->read_handler) return C_OK;
 
     conn->read_handler = func;
     if (!conn->read_handler)
         aeDeleteFileEvent(server.el,conn->fd,AE_READABLE);
     else
-        if (aeCreateFileEvent(server.el,conn->fd,       //ldc:1、使用epoll_ctl添加监听新事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProc=readQueryFromClient、clientData=conn进行赋值
+        if (aeCreateFileEvent(server.el,conn->fd,       //ldc:1、使用epoll_ctl添加监听新事件 2、对eventLoop->events[fd]的mask、rfileProc=wfileProc=conn->type->ae_handler=connSocketEventHandler、clientData=conn进行赋值
                     AE_READABLE,conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
     return C_OK;
 }
@@ -307,7 +307,7 @@ static void connSocketEventHandler(struct aeEventLoop *el, int fd, void *clientD
 
     /* Handle normal I/O flows */
     if (!invert && call_read) {
-        if (!callHandler(conn, conn->read_handler)) return;
+        if (!callHandler(conn, conn->read_handler)) return;     //ldc:相当调用callHandler(conn, readQueryFromClient)
     }
     /* Fire the writable event. */
     if (call_write) {

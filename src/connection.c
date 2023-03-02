@@ -101,7 +101,7 @@ connection *connCreateAcceptedSocket(int fd) {      //ldc:创建socket-type conn
 
 static int connSocketConnect(connection *conn, const char *addr, int port, const char *src_addr,
         ConnectionCallbackFunc connect_handler) {
-    int fd = anetTcpNonBlockBestEffortBindConnect(NULL,addr,port,src_addr);
+    int fd = anetTcpNonBlockBestEffortBindConnect(NULL,addr,port,src_addr);     //ldc:尽最大努力连接到master
     if (fd == -1) {
         conn->state = CONN_STATE_ERROR;
         conn->last_errno = errno;
@@ -112,7 +112,7 @@ static int connSocketConnect(connection *conn, const char *addr, int port, const
     conn->state = CONN_STATE_CONNECTING;
 
     conn->conn_handler = connect_handler;
-    aeCreateFileEvent(server.el, conn->fd, AE_WRITABLE,
+    aeCreateFileEvent(server.el, conn->fd, AE_WRITABLE,     //ldc:添加监听事件
             conn->type->ae_handler, conn);
 
     return C_OK;

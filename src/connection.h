@@ -71,7 +71,7 @@ typedef struct ConnectionType {     //ldc:封装了客户端连接对象的一�
     ssize_t (*sync_write)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步写
     ssize_t (*sync_read)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步读
     ssize_t (*sync_readline)(struct connection *conn, char *ptr, ssize_t size, long long timeout);       //ldc:异步读取一行
-    int (*get_type)(struct connection *conn);
+    int (*get_type)(struct connection *conn);       //返回CONN_TYPE_SOCKET或者CONN_TYPE_TLS
 } ConnectionType;
 
 struct connection {
@@ -105,7 +105,7 @@ struct connection {
  * a connClose() must be called.
  */
 
-static inline int connAccept(connection *conn, ConnectionCallbackFunc accept_handler) {
+static inline int connAccept(connection *conn, ConnectionCallbackFunc accept_handler) {     //ldc:接受连接(已经创建好的socket)
     return conn->type->accept(conn, accept_handler);        //ldc:实际上调用的回调函数是 connSocketAccept,主要完成两个任务:1、将conn的状态从CONN_STATE_ACCEPTING转变为CONN_STATE_CONNECTED 2、在callHandler中调用accept_handler函数，此处即 clientAcceptHandler，校验conn状态
 }
 
@@ -118,7 +118,7 @@ static inline int connAccept(connection *conn, ConnectionCallbackFunc accept_han
  * If C_ERR is returned, the operation failed and the connection handler shall
  * not be expected.
  */
-static inline int connConnect(connection *conn, const char *addr, int port, const char *src_addr,
+static inline int connConnect(connection *conn, const char *addr, int port, const char *src_addr,       //ldc:连接(cluster、replication需要连接Master)
         ConnectionCallbackFunc connect_handler) {
     return conn->type->connect(conn, addr, port, src_addr, connect_handler);
 }
@@ -129,7 +129,7 @@ static inline int connConnect(connection *conn, const char *addr, int port, cons
  * connections, but should probably be refactored out of cluster.c and replication.c,
  * in favor of a pure async implementation.
  */
-static inline int connBlockingConnect(connection *conn, const char *addr, int port, long long timeout) {
+static inline int connBlockingConnect(connection *conn, const char *addr, int port, long long timeout) {        //ldc:阻塞连接
     return conn->type->blocking_connect(conn, addr, port, timeout);
 }
 
@@ -140,7 +140,7 @@ static inline int connBlockingConnect(connection *conn, const char *addr, int po
  * The caller should NOT rely on errno. Testing for an EAGAIN-like condition, use
  * connGetState() to see if the connection state is still CONN_STATE_CONNECTED.
  */
-static inline int connWrite(connection *conn, const void *data, size_t data_len) {
+static inline int connWrite(connection *conn, const void *data, size_t data_len) {      //ldc:写入connection
     return conn->type->write(conn, data, data_len);
 }
 
@@ -152,7 +152,7 @@ static inline int connWrite(connection *conn, const void *data, size_t data_len)
  * The caller should NOT rely on errno. Testing for an EAGAIN-like condition, use
  * connGetState() to see if the connection state is still CONN_STATE_CONNECTED.
  */
-static inline int connWritev(connection *conn, const struct iovec *iov, int iovcnt) {
+static inline int connWritev(connection *conn, const struct iovec *iov, int iovcnt) {       //ldc:聚合iov[0], iov[1], ..., iov[iovcnt-1]然后写入connection
     return conn->type->writev(conn, iov, iovcnt);
 }
 
@@ -164,7 +164,7 @@ static inline int connWritev(connection *conn, const struct iovec *iov, int iovc
  * The caller should NOT rely on errno. Testing for an EAGAIN-like condition, use
  * connGetState() to see if the connection state is still CONN_STATE_CONNECTED.
  */
-static inline int connRead(connection *conn, void *buf, size_t buf_len) {
+static inline int connRead(connection *conn, void *buf, size_t buf_len) {       //ldc:从connection读
     int ret = conn->type->read(conn, buf, buf_len);
     return ret;
 }
@@ -172,7 +172,7 @@ static inline int connRead(connection *conn, void *buf, size_t buf_len) {
 /* Register a write handler, to be called when the connection is writable.
  * If NULL, the existing handler is removed.
  */
-static inline int connSetWriteHandler(connection *conn, ConnectionCallbackFunc func) {
+static inline int connSetWriteHandler(connection *conn, ConnectionCallbackFunc func) {      //ldc:设置connection的write_handler为func
     return conn->type->set_write_handler(conn, func, 0);
 }
 
@@ -192,31 +192,31 @@ static inline int connSetWriteHandlerWithBarrier(connection *conn, ConnectionCal
     return conn->type->set_write_handler(conn, func, barrier);
 }
 
-static inline void connClose(connection *conn) {
+static inline void connClose(connection *conn) {        //ldc:关闭connection
     conn->type->close(conn);
 }
 
 /* Returns the last error encountered by the connection, as a string.  If no error,
  * a NULL is returned.
  */
-static inline const char *connGetLastError(connection *conn) {
+static inline const char *connGetLastError(connection *conn) {      //ldc:获取最近的error信息
     return conn->type->get_last_error(conn);
 }
 
-static inline ssize_t connSyncWrite(connection *conn, char *ptr, ssize_t size, long long timeout) {
+static inline ssize_t connSyncWrite(connection *conn, char *ptr, ssize_t size, long long timeout) {     //ldc:同步写
     return conn->type->sync_write(conn, ptr, size, timeout);
 }
 
-static inline ssize_t connSyncRead(connection *conn, char *ptr, ssize_t size, long long timeout) {
+static inline ssize_t connSyncRead(connection *conn, char *ptr, ssize_t size, long long timeout) {     //ldc:同步读
     return conn->type->sync_read(conn, ptr, size, timeout);
 }
 
-static inline ssize_t connSyncReadLine(connection *conn, char *ptr, ssize_t size, long long timeout) {
+static inline ssize_t connSyncReadLine(connection *conn, char *ptr, ssize_t size, long long timeout) {     //ldc:读一行
     return conn->type->sync_readline(conn, ptr, size, timeout);
 }
 
 /* Return CONN_TYPE_* for the specified connection */
-static inline int connGetType(connection *conn) {
+static inline int connGetType(connection *conn) {       //返回CONN_TYPE_SOCKET或者CONN_TYPE_TLS
     return conn->type->get_type(conn);
 }
 
@@ -224,31 +224,31 @@ static inline int connLastErrorRetryable(connection *conn) {
     return conn->last_errno == EINTR;
 }
 
-connection *connCreateSocket();
-connection *connCreateAcceptedSocket(int fd);
+connection *connCreateSocket();     //ldc:创建Socket
+connection *connCreateAcceptedSocket(int fd);       //ldc:创建、接受Socket
 
-connection *connCreateTLS();
-connection *connCreateAcceptedTLS(int fd, int require_auth);
+connection *connCreateTLS();        //ldc:创建TLS
+connection *connCreateAcceptedTLS(int fd, int require_auth);        //ldc:创建、接受TLS
 
-void connSetPrivateData(connection *conn, void *data);
-void *connGetPrivateData(connection *conn);
-int connGetState(connection *conn);
-int connHasWriteHandler(connection *conn);
-int connHasReadHandler(connection *conn);
-int connGetSocketError(connection *conn);
+void connSetPrivateData(connection *conn, void *data);      //ldc:设置connection的PrivateData
+void *connGetPrivateData(connection *conn);      //ldc:获取connection的PrivateData
+int connGetState(connection *conn);     //ldc:获取连接状态
+int connHasWriteHandler(connection *conn);      //ldc:write_handler是否有值
+int connHasReadHandler(connection *conn);       //ldc:read_handler是否有值
+int connGetSocketError(connection *conn);       //ldc:获取socket的error
 
-/* anet-style wrappers to conns */
-int connBlock(connection *conn);
-int connNonBlock(connection *conn);
-int connEnableTcpNoDelay(connection *conn);
-int connDisableTcpNoDelay(connection *conn);
+/* anet-style wrappers to conns */      //ldc:封装anet风格到conns
+int connBlock(connection *conn);      //ldc:阻塞
+int connNonBlock(connection *conn);      //ldc:非阻塞
+int connEnableTcpNoDelay(connection *conn);      //ldc:TCP没延迟
+int connDisableTcpNoDelay(connection *conn);      //ldc:TCP可以延迟
 int connKeepAlive(connection *conn, int interval);
-int connSendTimeout(connection *conn, long long ms);
-int connRecvTimeout(connection *conn, long long ms);
-int connPeerToString(connection *conn, char *ip, size_t ip_len, int *port);
+int connSendTimeout(connection *conn, long long ms);        //ldc:发包超时设置
+int connRecvTimeout(connection *conn, long long ms);        //ldc:收包超时设置
+int connPeerToString(connection *conn, char *ip, size_t ip_len, int *port);        //ldc:格式化地址
 int connFormatFdAddr(connection *conn, char *buf, size_t buf_len, int fd_to_str_type);
-int connSockName(connection *conn, char *ip, size_t ip_len, int *port);
-const char *connGetInfo(connection *conn, char *buf, size_t buf_len);
+int connSockName(connection *conn, char *ip, size_t ip_len, int *port);        //ldc:SOCKET名字
+const char *connGetInfo(connection *conn, char *buf, size_t buf_len);       //ldc:获取fb
 
 /* Helpers for tls special considerations */
 sds connTLSGetPeerCert(connection *conn);

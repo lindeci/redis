@@ -273,7 +273,7 @@ static int64_t usUntilEarliestTimer(aeEventLoop *eventLoop) {
 }
 
 /* Process time events */
-static int processTimeEvents(aeEventLoop *eventLoop) {
+static int processTimeEvents(aeEventLoop *eventLoop) {      //ldc:遍历时间事件链表，判断当前时间事件是否已经到期，如果到期则执行时间事件处理函数 timeProc
     int processed = 0;
     aeTimeEvent *te;
     long long maxId;
@@ -285,7 +285,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
         long long id;
 
         /* Remove events scheduled for deletion. */
-        if (te->id == AE_DELETED_EVENT_ID) {
+        if (te->id == AE_DELETED_EVENT_ID) {        //ldc:如果时间事件已被删除，直接从事件链表中删除即可
             aeTimeEvent *next = te->next;
             /* If a reference exists for this timer event,
              * don't free it. This is currently incremented
@@ -314,17 +314,17 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
          * add new timers on the head, however if we change the implementation
          * detail, this check may be useful again: we keep it here for future
          * defense. */
-        if (te->id > maxId) {
+        if (te->id > maxId) {       //ldc:如果在当前轮次时间事件处理过程中产生新的时间事件，就留到下一个轮次在进行处理
             te = te->next;
             continue;
         }
 
-        if (te->when <= now) {
+        if (te->when <= now) {      //ldc:如果指定的执行时间到了，就执行；反之，跳到下一个事件判断
             int retval;
 
             id = te->id;
             te->refcount++;
-            retval = te->timeProc(eventLoop, id, te->clientData);
+            retval = te->timeProc(eventLoop, id, te->clientData);       //ldc:核心逻辑，执行事件（具体timeProc由调用方指定）.cron函数有clientsCron、databasesCron、replicationCron、clusterCron、modulesCron
             te->refcount--;
             processed++;
             now = getMonotonicUs();
@@ -404,7 +404,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         numevents = aeApiPoll(eventLoop, tvp);      //ldc:通过epoll_wait获取epoll_event集合,然后封装到eventLoop->fired
 
         /* After sleep callback. */
-        if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
+        if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)       //ldc:只处理module
             eventLoop->aftersleep(eventLoop);       //ldc:获取epoll_event集合后执行aftersleep
 
         for (j = 0; j < numevents; j++) {       //ldc:循环处理epoll_event集合
@@ -463,7 +463,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
     }
     /* Check time events */
     if (flags & AE_TIME_EVENTS)
-        processed += processTimeEvents(eventLoop);
+        processed += processTimeEvents(eventLoop);      //ldc:处理时间事件
 
     return processed; /* return the number of processed file/time events */
 }

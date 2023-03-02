@@ -925,7 +925,7 @@ typedef struct redisDb {
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
     int id;                     /* Database ID */
     long long avg_ttl;          /* Average TTL, just for stats */
-    unsigned long expires_cursor; /* Cursor of the active expire cycle. */
+    unsigned long expires_cursor; /* Cursor of the active expire cycle. */      //ldc:记录expire到哪个槽
     list *defrag_later;         /* List of key names to attempt to defrag one by one, gradually. */
     clusterSlotToKeyMapping *slots_to_keys; /* Array of slots to keys. Only used in cluster mode (db 0). */
 } redisDb;
@@ -1091,9 +1091,9 @@ typedef struct client {
     int resp;               /* RESP protocol version. Can be 2 or 3. */
     redisDb *db;            /* Pointer to currently SELECTed DB. */
     robj *name;             /* As set by CLIENT SETNAME. */
-    sds querybuf;           /* Buffer we use to accumulate client queries. */
-    size_t qb_pos;          /* The position we have read in querybuf. */
-    size_t querybuf_peak;   /* Recent (100ms or more) peak of querybuf size. */
+    sds querybuf;           /* Buffer we use to accumulate client queries. */       //ldc:客户端请求buffer
+    size_t qb_pos;          /* The position we have read in querybuf. */       //ldc:querybuf中的读取偏移量
+    size_t querybuf_peak;   /* Recent (100ms or more) peak of querybuf size. */     //ldc:最近100毫秒内querybuf的峰值
     int argc;               /* Num of arguments of current command. */
     robj **argv;            /* Arguments of current command. */
     int argv_len;           /* Size of argv array (may be more than argc) */
@@ -1110,8 +1110,8 @@ typedef struct client {
     int reqtype;            /* Request protocol type: PROTO_REQ_* */
     int multibulklen;       /* Number of multi bulk arguments left to read. */
     long bulklen;           /* Length of bulk argument in multi bulk request. */
-    list *reply;            /* List of reply objects to send to the client. */
-    unsigned long long reply_bytes; /* Tot bytes of objects in reply list. */
+    list *reply;            /* List of reply objects to send to the client. */      //ldc:返回给client的objects列表
+    unsigned long long reply_bytes; /* Tot bytes of objects in reply list. */       //ldc:replay list的总字节长度
     list *deferred_reply_errors;    /* Used for module thread safe contexts. */
     size_t sentlen;         /* Amount of bytes already sent in the current
                                buffer or object being sent. */
@@ -1189,11 +1189,11 @@ typedef struct client {
                                   * i.e. the next offset to send. */
 
     /* Response buffer */
-    size_t buf_peak; /* Peak used size of buffer in last 5 sec interval. */
+    size_t buf_peak; /* Peak used size of buffer in last 5 sec interval. */     //ldc:5秒内buffer的峰值
     mstime_t buf_peak_last_reset_time; /* keeps the last time the buffer peak value was reset */
-    int bufpos;
-    size_t buf_usable_size; /* Usable size of buffer. */
-    char *buf;
+    int bufpos;     //ldc:填充的buffer长度
+    size_t buf_usable_size; /* Usable size of buffer. */        //ldc:buffer的可用大小
+    char *buf;      //ldc:回复的buffer
 } client;
 
 struct saveparam {

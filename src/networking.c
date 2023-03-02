@@ -100,7 +100,7 @@ void linkClient(client *c) {        //ldc:把client添加到server.clients列表
 
 /* Initialize client authentication state.
  */
-static void clientSetDefaultAuth(client *c) {
+static void clientSetDefaultAuth(client *c) {       //ldc:如果default用户没有被禁用，并且default未配置密码，则此客户端后续不需要进行登录认证，直接就算认证通过了
     /* If the default user does not require authentication, the user is
      * directly authenticated. */
     c->user = DefaultUser;
@@ -108,7 +108,7 @@ static void clientSetDefaultAuth(client *c) {
                        !(c->user->flags & USER_FLAG_DISABLED);
 }
 
-int authRequired(client *c) {
+int authRequired(client *c) {   //ldc:查看当前用户是否是认证过的
     /* Check if the user is authenticated. This check is skipped in case
      * the default user is flagged as "nopass" and is active. */
     int auth_required = (!(DefaultUser->flags & USER_FLAG_NOPASS) ||
@@ -325,25 +325,25 @@ int prepareClientToWrite(client *c) {
  * zmalloc_usable_size() call. Writing beyond client->buf boundaries confuses
  * sanitizer and generates a false positive out-of-bounds error */
 REDIS_NO_SANITIZE("bounds")
-size_t _addReplyToBuffer(client *c, const char *s, size_t len) {
-    size_t available = c->buf_usable_size - c->bufpos;
+size_t _addReplyToBuffer(client *c, const char *s, size_t len) {        //ldc:把s填充c->buf
+    size_t available = c->buf_usable_size - c->bufpos;      //ldc:计算buffer的可用长度
 
     /* If there already are entries in the reply list, we cannot
      * add anything more to the static buffer. */
-    if (listLength(c->reply) > 0) return 0;
+    if (listLength(c->reply) > 0) return 0;     //ldc:如果c->reply列表不为空，则返回
 
     size_t reply_len = len > available ? available : len;
     memcpy(c->buf+c->bufpos,s,reply_len);
     c->bufpos+=reply_len;
     /* We update the buffer peak after appending the reply to the buffer */
-    if(c->buf_peak < (size_t)c->bufpos)
+    if(c->buf_peak < (size_t)c->bufpos)     //ldc:更新c->buf_peak(回复的buffer长度)的峰值
         c->buf_peak = (size_t)c->bufpos;
     return reply_len;
 }
 
 /* Adds the reply to the reply linked list.
  * Note: some edits to this function need to be relayed to AddReplyFromClient. */
-void _addReplyProtoToList(client *c, const char *s, size_t len) {
+void _addReplyProtoToList(client *c, const char *s, size_t len) {       //ldc:把s添加到c->reply列表
     listNode *ln = listLast(c->reply);
     clientReplyBlock *tail = ln? listNodeValue(ln): NULL;
 
@@ -379,7 +379,7 @@ void _addReplyProtoToList(client *c, const char *s, size_t len) {
     }
 }
 
-void _addReplyToBufferOrList(client *c, const char *s, size_t len) {
+void _addReplyToBufferOrList(client *c, const char *s, size_t len) {        //ldc:先把s添加到c->buf,如果超长,则把剩余的字符串添加到c->reply列表
     if (c->flags & CLIENT_CLOSE_AFTER_REPLY) return;
 
     /* Replicas should normally not cause any writes to the reply buffer. In case a rogue replica sent a command on the
@@ -393,8 +393,8 @@ void _addReplyToBufferOrList(client *c, const char *s, size_t len) {
         return;
     }
 
-    size_t reply_len = _addReplyToBuffer(c,s,len);
-    if (len > reply_len) _addReplyProtoToList(c,s+reply_len,len-reply_len);
+    size_t reply_len = _addReplyToBuffer(c,s,len);      //ldc:先把s添加到c->buf
+    if (len > reply_len) _addReplyProtoToList(c,s+reply_len,len-reply_len);     //ldc:如果超长,则把剩余的字符串添加到c->reply列表
 }
 
 /* -----------------------------------------------------------------------------
@@ -422,7 +422,7 @@ void addReply(client *c, robj *obj) {       //ldc:把obj添加到client output b
 
 /* Add the SDS 's' string to the client output buffer, as a side effect
  * the SDS string is freed. */
-void addReplySds(client *c, sds s) {
+void addReplySds(client *c, sds s) {       //ldc:把sds添加到client output buffer
     if (prepareClientToWrite(c) != C_OK) {
         /* The caller expects the sds to be free'd. */
         sdsfree(s);
@@ -1950,7 +1950,7 @@ int _writeToClient(client *c, ssize_t *nwritten) {
  * This function is called by threads, but always with handler_installed
  * set to 0. So when handler_installed is set to 0 the function must be
  * thread safe. */
-int writeToClient(client *c, int handler_installed) {
+int writeToClient(client *c, int handler_installed) {       //ldc:把c->buf回复给client.  如果handler_installed不为0,则把c->conn->write_handler设置为NULL. handler_installed一直为0
     /* Update total number of writes on server */
     atomicIncr(server.stat_total_writes_processed, 1);
 
@@ -2034,12 +2034,12 @@ void sendReplyToClient(connection *conn) {
  * we can just write the replies to the client output buffer without any
  * need to use a syscall in order to install the writable event handler,
  * get it called, and so forth. */
-int handleClientsWithPendingWrites(void) {
+int handleClientsWithPendingWrites(void) {      //ldc:遍历server.clients_pending_write,回复buf给客户端
     listIter li;
     listNode *ln;
     int processed = listLength(server.clients_pending_write);
 
-    listRewind(server.clients_pending_write,&li);
+    listRewind(server.clients_pending_write,&li);       //ldc:重置为正向迭代器
     while((ln = listNext(&li))) {
         client *c = listNodeValue(ln);
         c->flags &= ~CLIENT_PENDING_WRITE;
@@ -2053,7 +2053,7 @@ int handleClientsWithPendingWrites(void) {
         if (c->flags & CLIENT_CLOSE_ASAP) continue;
 
         /* Try to write buffers to the client socket. */
-        if (writeToClient(c,0) == C_ERR) continue;
+        if (writeToClient(c,0) == C_ERR) continue;      //ldc:回复buf给客户端
 
         /* If after the synchronous writes above we still have data to
          * output to the client, we need to install the writable handler. */
@@ -4039,7 +4039,7 @@ void processEventsWhileBlocked(void) {
 #endif
 #endif
 
-typedef struct __attribute__((aligned(CACHE_LINE_SIZE))) threads_pending {
+typedef struct __attribute__((aligned(CACHE_LINE_SIZE))) threads_pending {      //ldc:1、attribute ((packed))的作用就是告诉编译器取消结构在编译过程中的优化对齐,按照实际占用字节数进行对齐，是GCC特有的语法 2、attribute ((aligned(n)))的作用就是告诉编译器在编译过程中按照n字节对齐。常常用来在结构体后面进行修饰
     redisAtomic unsigned long value;
 } threads_pending;
 
@@ -4135,7 +4135,7 @@ void initThreadedIO(void) {     //ldc:Redis 的多线程模式默认是关闭的
         /* Things we do only for the additional threads. */
         pthread_t tid;      //ldc:初始化 I/O 线程并启动
         pthread_mutex_init(&io_threads_mutex[i],NULL);      //ldc:每个 I/O 线程会分配一个本地锁，用来休眠和唤醒线程
-        setIOPendingCount(i, 0);        //ldc:每个 I/O 线程分配一个原子计数器，用来记录当前遗留的任务数量
+        setIOPendingCount(i, 0);        //ldc:每个 I/O 线程分配一个原子计数器，用来记录当前遗留的任务数量.  atomicSetWithSync(io_threads_pending[i].value, count)
         pthread_mutex_lock(&io_threads_mutex[i]); /* Thread will be stopped. */     //ldc:主线程在启动 I/O 线程的时候会默认先锁住它，直到有 I/O 任务才唤醒
         if (pthread_create(&tid,NULL,IOThreadMain,(void*)(long)i) != 0) {       //ldc:启动线程，进入 I/O 线程的主逻辑函数 IOThreadMain
             serverLog(LL_WARNING,"Fatal: Can't initialize IO thread.");

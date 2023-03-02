@@ -319,8 +319,8 @@ robj *dbRandomKey(redisDb *db) {
 static int dbGenericDelete(redisDb *db, robj *key, int async) {
     /* Deleting an entry from the expires dict will not free the sds of
      * the key, because it is shared with the main dictionary. */
-    if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);
-    dictEntry *de = dictUnlink(db->dict,key->ptr);
+    if (dictSize(db->expires) > 0) dictDelete(db->expires,key->ptr);        //ldc:先从db->expires中删除
+    dictEntry *de = dictUnlink(db->dict,key->ptr);        //ldc:然后从db->dict中Unlink
     if (de) {
         robj *val = dictGetVal(de);
         /* Tells the module that the key has been unlinked from the database. */
@@ -333,7 +333,7 @@ static int dbGenericDelete(redisDb *db, robj *key, int async) {
             dictSetVal(db->dict, de, NULL);
         }
         if (server.cluster_enabled) slotToKeyDelEntry(de, db);
-        dictFreeUnlinkedEntry(db->dict,de);
+        dictFreeUnlinkedEntry(db->dict,de);     //ldc:再释放dictEntry
         return 1;
     } else {
         return 0;
@@ -1560,7 +1560,7 @@ long long getExpire(redisDb *db, robj *key) {
 }
 
 /* Delete the specified expired key and propagate expire. */
-void deleteExpiredKeyAndPropagate(redisDb *db, robj *keyobj) {
+void deleteExpiredKeyAndPropagate(redisDb *db, robj *keyobj) {      //ldc:删除过期的key然后广播
     mstime_t expire_latency;
     latencyStartMonitor(expire_latency);
     if (server.lazyfree_lazy_expire)

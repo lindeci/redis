@@ -937,7 +937,7 @@ void getExpansiveClientsInfo(size_t *in_usage, size_t *out_usage) {
  * of clients per second, turning this function into a source of latency.
  */
 #define CLIENTS_CRON_MIN_ITERATIONS 5
-void clientsCron(void) {
+void clientsCron(void) {        //ldc:主要处理 超时客户端断开连接、释放客户端 query_buffer、更新统计信息（INFO 命令）等
     /* Try to process at least numclients/server.hz of clients
      * per call. Since normally (if there are no big latency events) this
      * function is called server.hz times per second, in the average case we
@@ -949,7 +949,7 @@ void clientsCron(void) {
     /* Process at least a few clients while we are at it, even if we need
      * to process less than CLIENTS_CRON_MIN_ITERATIONS to meet our contract
      * of processing each client once per second. */
-    if (iterations < CLIENTS_CRON_MIN_ITERATIONS)
+    if (iterations < CLIENTS_CRON_MIN_ITERATIONS)       //ldc:iterations 控制每次（周期）处理客户端的数量
         iterations = (numclients < CLIENTS_CRON_MIN_ITERATIONS) ?
                      numclients : CLIENTS_CRON_MIN_ITERATIONS;
 
@@ -978,17 +978,17 @@ void clientsCron(void) {
         /* Rotate the list, take the current head, process.
          * This way if the client must be removed from the list it's the
          * first element and we don't incur into O(N) computation. */
-        listRotateTailToHead(server.clients);
+        listRotateTailToHead(server.clients);       //ldc:将尾部元素挪到首位（当要移除该元素时可直接移除首位元素，避免O(N)的遍历 ）
         head = listFirst(server.clients);
         c = listNodeValue(head);
         /* The following functions do different service checks on the client.
          * The protocol is that they return non-zero if the client was
          * terminated. */
-        if (clientsCronHandleTimeout(c,now)) continue;
-        if (clientsCronResizeQueryBuffer(c)) continue;
+        if (clientsCronHandleTimeout(c,now)) continue;      //ldc:超时处理
+        if (clientsCronResizeQueryBuffer(c)) continue;      //ldc:query_buffer 处理
         if (clientsCronResizeOutputBuffer(c,now)) continue;
 
-        if (clientsCronTrackExpansiveClients(c, curr_peak_mem_usage_slot)) continue;
+        if (clientsCronTrackExpansiveClients(c, curr_peak_mem_usage_slot)) continue;        //ldc:统计 - 最近时间消耗最高的客户端信息
 
         /* Iterating all the clients in getMemoryOverheadData() is too slow and
          * in turn would make the INFO command too slow. So we perform this
@@ -996,7 +996,7 @@ void clientsCron(void) {
          * to the second) total memory used by clients using clientsCron() in
          * a more incremental way (depending on server.hz).
          * If client eviction is enabled, update the bucket as well. */
-        if (!updateClientMemUsageAndBucket(c))
+        if (!updateClientMemUsageAndBucket(c))      //ldc:统计 - 内存使用信息
             updateClientMemoryUsage(c);
 
         if (closeClientOnOutputBufferLimitReached(c, 0)) continue;
@@ -1006,10 +1006,10 @@ void clientsCron(void) {
 /* This function handles 'background' operations we are required to do
  * incrementally in Redis databases, such as active key expiring, resizing,
  * rehashing. */
-void databasesCron(void) {
+void databasesCron(void) {      //ldc:主要针对 DB 的后台操作，比如 key 过期清理、磁盘碎片整理 、字典 resize / rehash
     /* Expire keys by random sampling. Not required for slaves
      * as master will synthesize DELs for us. */
-    if (server.active_expire_enabled) {
+    if (server.active_expire_enabled) {     //ldc:随机抽样淘汰已过期的键
         if (iAmMaster()) {
             activeExpireCycle(ACTIVE_EXPIRE_CYCLE_SLOW);
         } else {
@@ -1018,12 +1018,12 @@ void databasesCron(void) {
     }
 
     /* Defrag keys gradually. */
-    activeDefragCycle();
+    activeDefragCycle();        //ldc:整理磁盘碎片
 
     /* Perform hash tables rehashing if needed, but only if there are no
      * other processes saving the DB on disk. Otherwise rehashing is bad
      * as will cause a lot of copy-on-write of memory pages. */
-    if (!hasActiveChildProcess()) {
+    if (!hasActiveChildProcess()) {     //ldc:在进行 rehash 前先检查是否有子进程在活动（RDB、AOF），避免同时大量 copy-on-write 使内存紧张
         /* We use global counters so if we stop the computation at a given
          * DB we'll be able to start from the successive in the next
          * cron loop iteration. */
@@ -1036,20 +1036,20 @@ void databasesCron(void) {
         if (dbs_per_call > server.dbnum) dbs_per_call = server.dbnum;
 
         /* Resize */
-        for (j = 0; j < dbs_per_call; j++) {
+        for (j = 0; j < dbs_per_call; j++) {        //ldc:这一步其实是尝试对db字典进行缩容，条件是 used_size / total_size <= 10%. 值得注意的是，这一步只是打开渐进式 rehash 标识，并未开始真正元素迁移
             tryResizeHashTables(resize_db % server.dbnum);
             resize_db++;
         }
 
         /* Rehash */
-        if (server.activerehashing) {
+        if (server.activerehashing) {       //ldc:渐进式 rehash. 如果渐进式 rehash 标识已经打开，开始真正元素迁移
             for (j = 0; j < dbs_per_call; j++) {
                 int work_done = incrementallyRehash(rehash_db);
                 if (work_done) {
                     /* If the function did some work, stop here, we'll do
                      * more at the next cron loop. */
                     break;
-                } else {
+                } else {        //ldc:该 db 不需要 rehash，则进行下一个
                     /* If this db didn't need rehash, we'll try the next one. */
                     rehash_db++;
                     rehash_db %= server.dbnum;
@@ -1148,7 +1148,7 @@ void checkChildrenDone(void) {
 void cronUpdateMemoryStats() {
     /* Record the max memory used since the server was started. */
     if (zmalloc_used_memory() > server.stat_peak_memory)
-        server.stat_peak_memory = zmalloc_used_memory();
+        server.stat_peak_memory = zmalloc_used_memory();        //ldc:记录内存使用峰值
 
     run_with_period(100) {
         /* Sample the RSS and other metrics here since this is a relatively slow call.
@@ -1198,7 +1198,7 @@ void cronUpdateMemoryStats() {
  * a macro is used: run_with_period(milliseconds) { .... }
  */
 
-int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
+int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {     //ldc:cron函数有clientsCron、databasesCron、replicationCron、clusterCron、modulesCron
     int j;
     UNUSED(eventLoop);
     UNUSED(id);
@@ -1209,12 +1209,12 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     if (server.watchdog_period) watchdogScheduleSignal(server.watchdog_period);
 
     /* Update the time cache. */
-    updateCachedTime(1);
+    updateCachedTime(1);        //ldc:更新server缓存时间
 
     server.hz = server.config_hz;
     /* Adapt the server.hz value to the number of configured clients. If we have
      * many clients, we want to call serverCron() with an higher frequency. */
-    if (server.dynamic_hz) {
+    if (server.dynamic_hz) {        //ldc:如果开启动态频率,则把hz调整为server.clients/MAX_CLIENTS_PER_CLOCK_TICK(200),同时限制server.hz 最大为 CONFIG_MAX_HZ
         while (listLength(server.clients) / server.hz >
                MAX_CLIENTS_PER_CLOCK_TICK)
         {
@@ -1229,7 +1229,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     /* for debug purposes: skip actual cron work if pause_cron is on */
     if (server.pause_cron) return 1000/server.hz;
 
-    run_with_period(100) {
+    run_with_period(100) {      //ldc:以每100ms一次的频率采样，统计时间段内服务器请求数、流量等信息；然后计算平均一毫米的处理量，乘以1000就是估算1s的处理量；这个估量会存放的服务端状态inst_metric的环形数组中；当客户端执行info命令，就会去server.h/inst_metric数组拿去取样结果
         long long stat_net_input_bytes, stat_net_output_bytes;
         long long stat_net_repl_input_bytes, stat_net_repl_output_bytes;
         atomicGet(server.stat_net_input_bytes, stat_net_input_bytes);
@@ -1262,11 +1262,11 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     unsigned int lruclock = getLRUClock();
     atomicSet(server.lruclock,lruclock);
 
-    cronUpdateMemoryStats();
+    cronUpdateMemoryStats();        //ldc:更新内存的统计信息
 
     /* We received a SIGTERM or SIGINT, shutting down here in a safe way, as it is
      * not ok doing so inside the signal handler. */
-    if (server.shutdown_asap && !isShutdownInitiated()) {
+    if (server.shutdown_asap && !isShutdownInitiated()) {       //ldc:处理SIGTERM信号
         int shutdownFlags = SHUTDOWN_NOFLAGS;
         if (server.last_sig_received == SIGINT && server.shutdown_on_sigint)
             shutdownFlags = server.shutdown_on_sigint;
@@ -1282,7 +1282,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     /* Show some info about non-empty databases */
-    if (server.verbosity <= LL_VERBOSE) {
+    if (server.verbosity <= LL_VERBOSE) {       //ldc:每5秒打印 DB 0: 5 keys (1 volatile) in 8 slots HT.
         run_with_period(5000) {
             for (j = 0; j < server.dbnum; j++) {
                 long long size, used, vkeys;
@@ -1298,7 +1298,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     /* Show information about connected clients */
-    if (!server.sentinel_mode) {
+    if (!server.sentinel_mode) {        //ldc:每5秒打印 0 clients connected (0 replicas), 859040 bytes in use
         run_with_period(5000) {
             serverLog(LL_DEBUG,
                 "%lu clients connected (%lu replicas), %zu bytes in use",
@@ -1309,10 +1309,10 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     /* We need to do a few operations on clients asynchronously. */
-    clientsCron();
+    clientsCron();      //ldc:异步的clients的定时任务
 
     /* Handle background operations on Redis databases. */
-    databasesCron();
+    databasesCron();      //ldc:主要针对 DB 的后台操作，比如 key 过期清理、磁盘碎片整理 、字典 resize / rehash
 
     /* Start a scheduled AOF rewrite if this was requested by the user while
      * a BGSAVE was in progress. */
@@ -1320,13 +1320,13 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         server.aof_rewrite_scheduled &&
         !aofRewriteLimited())
     {
-        rewriteAppendOnlyFileBackground();
+        rewriteAppendOnlyFileBackground();      //ldc:重写AOF文件
     }
 
     /* Check if a background saving or AOF rewrite in progress terminated. */
     if (hasActiveChildProcess() || ldbPendingChildren())
     {
-        run_with_period(1000) receiveChildInfo();
+        run_with_period(1000) receiveChildInfo();       //ldc:每隔一秒检查AOF进程是否结束
         checkChildrenDone();
     } else {
         /* If there is not a background saving/rewrite in progress check if
@@ -1348,7 +1348,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
                     sp->changes, (int)sp->seconds);
                 rdbSaveInfo rsi, *rsiptr;
                 rsiptr = rdbPopulateSaveInfo(&rsi);
-                rdbSaveBackground(SLAVE_REQ_NONE,server.rdb_filename,rsiptr);
+                rdbSaveBackground(SLAVE_REQ_NONE,server.rdb_filename,rsiptr);       //ldc:后台保存rdb文件
                 break;
             }
         }
@@ -1364,7 +1364,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
             long long growth = (server.aof_current_size*100/base) - 100;
             if (growth >= server.aof_rewrite_perc && !aofRewriteLimited()) {
                 serverLog(LL_NOTICE,"Starting automatic rewriting of AOF on %lld%% growth",growth);
-                rewriteAppendOnlyFileBackground();
+                rewriteAppendOnlyFileBackground();      //ldc:重写AOF文件
             }
         }
     }
@@ -1378,7 +1378,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     if ((server.aof_state == AOF_ON || server.aof_state == AOF_WAIT_REWRITE) &&
         server.aof_flush_postponed_start)
     {
-        flushAppendOnlyFile(0);
+        flushAppendOnlyFile(0);     //ldc:AOF文件落盘
     }
 
     /* AOF write errors: in this case we have a buffer to flush as well and
@@ -1389,7 +1389,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         if ((server.aof_state == AOF_ON || server.aof_state == AOF_WAIT_REWRITE) &&
             server.aof_last_write_status == C_ERR) 
             {
-                flushAppendOnlyFile(0);
+                flushAppendOnlyFile(0);     //ldc:AOF文件落盘
             }
     }
 
@@ -1401,7 +1401,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
      * 
      * If Redis is trying to failover then run the replication cron faster so
      * progress on the handshake happens more quickly. */
-    if (server.failover_state != NO_FAILOVER) {
+    if (server.failover_state != NO_FAILOVER) {     //ldc:执行replicationCron
         run_with_period(100) replicationCron();
     } else {
         run_with_period(1000) replicationCron();
@@ -1409,7 +1409,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
 
     /* Run the Redis Cluster cron. */
     run_with_period(100) {
-        if (server.cluster_enabled) clusterCron();
+        if (server.cluster_enabled) clusterCron();      //ldc:执行clusterCron
     }
 
     /* Run the Sentinel timer if we are in sentinel mode. */
@@ -1417,11 +1417,11 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
 
     /* Cleanup expired MIGRATE cached sockets. */
     run_with_period(1000) {
-        migrateCloseTimedoutSockets();
+        migrateCloseTimedoutSockets();      //ldc:处理过期的scoket缓存
     }
 
     /* Stop the I/O threads if we don't have enough pending work. */
-    stopThreadedIOIfNeeded();
+    stopThreadedIOIfNeeded();       //ldc:如果条件允许,则关闭IO线程
 
     /* Resize tracking keys table if needed. This is also done at every
      * command execution, but we want to be sure that if the last command
@@ -1448,7 +1448,7 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
     }
 
     run_with_period(100) {
-        if (moduleCount()) modulesCron();
+        if (moduleCount()) modulesCron();       //ldc:执行modulesCron
     }
 
     /* Fire the cron loop modules event. */
@@ -1558,9 +1558,9 @@ extern int ProcessingEventsWhileBlocked;
  * The most important is freeClientsInAsyncFreeQueue but we also
  * call some other low-risk functions. */
 void beforeSleep(struct aeEventLoop *eventLoop) {
-    UNUSED(eventLoop);
+    UNUSED(eventLoop);      //ldc:宏将未使用的变量转换为空指针，避免编译时出现warnning
 
-    size_t zmalloc_used = zmalloc_used_memory();
+    size_t zmalloc_used = zmalloc_used_memory();        //ldc:获取used_memory. atomicGet(used_memory,um);
     if (zmalloc_used > server.stat_peak_memory)
         server.stat_peak_memory = zmalloc_used;
 
@@ -1569,7 +1569,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
      * case we keep track of the number of events we are processing, since
      * processEventsWhileBlocked() wants to stop ASAP if there are no longer
      * events to handle. */
-    if (ProcessingEventsWhileBlocked) {
+    if (ProcessingEventsWhileBlocked) {     //ldc:如果主进程阻塞,则统计有多少任务要处理. server.events_processed_while_blocked
         uint64_t processed = 0;
         processed += handleClientsWithPendingReadsUsingThreads();
         processed += tlsProcessPendingData();
@@ -1582,13 +1582,13 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
     }
 
     /* Handle precise timeouts of blocked clients. */
-    handleBlockedClientsTimeout();
+    handleBlockedClientsTimeout();      //ldc:处理tomeout和blocked的客户端
 
     /* We should handle pending reads clients ASAP after event loop. */
     handleClientsWithPendingReadsUsingThreads();        //ldc:1、遍历待读取的 client 队列 clients_pending_read，通过 RR 策略把所有任务分配给 I/O 线程和主线程去读取和解析客户端命令;2、忙轮询等待所有 I/O 线程完成任务;3、最后再遍历 clients_pending_read，执行所有 client 的命令
 
     /* Handle TLS pending data. (must be done before flushAppendOnlyFile) */
-    tlsProcessPendingData();
+    tlsProcessPendingData();        //ldc:处理tls的数据
 
     /* If tls still has pending unread data don't sleep at all. */
     aeSetDontWait(server.el, tlsHasPendingData());
@@ -1597,21 +1597,21 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
      * may change the state of Redis Cluster (from ok to fail or vice versa),
      * so it's a good idea to call it before serving the unblocked clients
      * later in this function. */
-    if (server.cluster_enabled) clusterBeforeSleep();
+    if (server.cluster_enabled) clusterBeforeSleep();       //ldc:如果开启了集群模式,调用clusterBeforeSleep
 
     /* Run a fast expire cycle (the called function will return
      * ASAP if a fast cycle is not needed). */
-    if (server.active_expire_enabled && server.masterhost == NULL)
+    if (server.active_expire_enabled && server.masterhost == NULL)      //ldc:处理过期key
         activeExpireCycle(ACTIVE_EXPIRE_CYCLE_FAST);
 
     /* Unblock all the clients blocked for synchronous replication
      * in WAIT. */
     if (listLength(server.clients_waiting_acks))
-        processClientsWaitingReplicas();
+        processClientsWaitingReplicas();        //ldc:解除因为synchronous replication导致阻塞的客户端
 
     /* Check if there are clients unblocked by modules that implement
      * blocking commands. */
-    if (moduleCount()) {
+    if (moduleCount()) {        //ldc:检查有没有因为module而阻塞的client
         moduleFireServerEvent(REDISMODULE_EVENT_EVENTLOOP,
                               REDISMODULE_SUBEVENT_EVENTLOOP_BEFORE_SLEEP,
                               NULL);
@@ -1620,7 +1620,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
 
     /* Try to process pending commands for clients that were just unblocked. */
     if (listLength(server.unblocked_clients))
-        processUnblockedClients();
+        processUnblockedClients();      //ldc:让刚刚(第1610行)解除阻塞的client挂起
 
     /* Send all the slaves an ACK request if at least one client blocked
      * during the previous event loop iteration. Note that we do this after
@@ -1631,7 +1631,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
      * We also don't send the ACKs while clients are paused, since it can
      * increment the replication backlog, they'll be sent after the pause
      * if we are still the master. */
-    if (server.get_ack_from_slaves && !checkClientPauseTimeoutAndReturnIfPaused()) {
+    if (server.get_ack_from_slaves && !checkClientPauseTimeoutAndReturnIfPaused()) {        //ldc:如果在上个事件循环中有一个client被阻塞，那么向所有slave发送ack
         sendGetackToReplicas();
         server.get_ack_from_slaves = 0;
     }
@@ -1639,7 +1639,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
     /* We may have received updates from clients about their current offset. NOTE:
      * this can't be done where the ACK is received since failover will disconnect 
      * our clients. */
-    updateFailoverStatus();
+    updateFailoverStatus();     //ldc:更新client的offset
 
     /* Since we rely on current_client to send scheduled invalidation messages
      * we have to flush them after each command, so when we get here, the list
@@ -1648,7 +1648,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
 
     /* Send the invalidation messages to clients participating to the
      * client side caching protocol in broadcasting (BCAST) mode. */
-    trackingBroadcastInvalidationMessages();
+    trackingBroadcastInvalidationMessages();        //ldc:如果有失效消息,则广播给客户端的缓存(开启了Tracking的客户端,使用本地缓存)
 
     /* Try to process blocked clients every once in while.
      *
@@ -1657,19 +1657,19 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
      *
      * must be done before flushAppendOnlyFile, in case of appendfsync=always,
      * since the unblocked clients may write data. */
-    handleClientsBlockedOnKeys();
+    handleClientsBlockedOnKeys();       //ldc:每次while循环中尝试一次处理被阻止的客户端
 
     /* Write the AOF buffer on disk,
      * must be done before handleClientsWithPendingWritesUsingThreads,
      * in case of appendfsync=always. */
     if (server.aof_state == AOF_ON || server.aof_state == AOF_WAIT_REWRITE)
-        flushAppendOnlyFile(0);
+        flushAppendOnlyFile(0);     //ldc:AOF buffer落盘
 
     /* Handle writes with pending output buffers. */
     handleClientsWithPendingWritesUsingThreads();       //ldc:写回响应
 
     /* Close clients that need to be closed asynchronous */
-    freeClientsInAsyncFreeQueue();
+    freeClientsInAsyncFreeQueue();      //ldc:关闭AsyncFreeQueue中的客户端
 
     /* Incrementally trim replication backlog, 10 times the normal speed is
      * to free replication backlog as much as possible. */
@@ -1677,7 +1677,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
         incrementalTrimReplicationBacklog(10*REPL_BACKLOG_TRIM_BLOCKS_PER_CALL);
 
     /* Disconnect some clients if they are consuming too much memory. */
-    evictClients();
+    evictClients();     //ldc:淘汰部分太占内存的客户端
 
     /* Before we are going to sleep, let the threads access the dataset by
      * releasing the GIL. Redis main thread will not touch anything at this
@@ -1690,7 +1690,7 @@ void beforeSleep(struct aeEventLoop *eventLoop) {
 /* This function is called immediately after the event loop multiplexing
  * API returned, and the control is going to soon return to Redis by invoking
  * the different events callbacks. */
-void afterSleep(struct aeEventLoop *eventLoop) {
+void afterSleep(struct aeEventLoop *eventLoop) {        //ldc:只处理module
     UNUSED(eventLoop);
 
     /* Do NOT add anything above moduleAcquireGIL !!! */

@@ -56,7 +56,7 @@ int activeExpireCycleTryExpire(redisDb *db, dictEntry *de, long long now) {
     if (now > t) {
         sds key = dictGetKey(de);
         robj *keyobj = createStringObject(key,sdslen(key));
-        deleteExpiredKeyAndPropagate(db,keyobj);
+        deleteExpiredKeyAndPropagate(db,keyobj);      //ldc:删除过期的key然后广播
         decrRefCount(keyobj);
         return 1;
     } else {
@@ -104,25 +104,25 @@ int activeExpireCycleTryExpire(redisDb *db, dictEntry *de, long long now) {
  * order to do more work in both the fast and slow expire cycles.
  */
 
-#define ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP 20 /* Keys for each DB loop. */
-#define ACTIVE_EXPIRE_CYCLE_FAST_DURATION 1000 /* Microseconds. */
-#define ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC 25 /* Max % of CPU to use. */
-#define ACTIVE_EXPIRE_CYCLE_ACCEPTABLE_STALE 10 /* % of stale keys after which
+#define ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP 20 /* Keys for each DB loop. */       //ldc:默认每次循环淘汰20个key
+#define ACTIVE_EXPIRE_CYCLE_FAST_DURATION 1000 /* Microseconds. */      //ldc:fast cycle时,默认分配1毫秒
+#define ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC 25 /* Max % of CPU to use. */        //ldc:slow_cycle时,默认分配25%的CPU
+#define ACTIVE_EXPIRE_CYCLE_ACCEPTABLE_STALE 10 /* % of stale keys after which      //ldc:do extra efforts时,保留10%的过期key
                                                    we do extra efforts. */
 
-void activeExpireCycle(int type) {
+void activeExpireCycle(int type) {      //ldc:定期删除
     /* Adjust the running parameters according to the configured expire
      * effort. The default effort is 1, and the maximum configurable effort
      * is 10. */
     unsigned long
     effort = server.active_expire_effort-1, /* Rescale from 0 to 9. */
-    config_keys_per_loop = ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP +
+    config_keys_per_loop = ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP +      //ldc:默认检查的键数量为20
                            ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP/4*effort,
-    config_cycle_fast_duration = ACTIVE_EXPIRE_CYCLE_FAST_DURATION +
+    config_cycle_fast_duration = ACTIVE_EXPIRE_CYCLE_FAST_DURATION +        //ldc:fast cycle时,默认分配1毫秒
                                  ACTIVE_EXPIRE_CYCLE_FAST_DURATION/4*effort,
-    config_cycle_slow_time_perc = ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC +
+    config_cycle_slow_time_perc = ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC +       //ldc:默认为25
                                   2*effort,
-    config_cycle_acceptable_stale = ACTIVE_EXPIRE_CYCLE_ACCEPTABLE_STALE-
+    config_cycle_acceptable_stale = ACTIVE_EXPIRE_CYCLE_ACCEPTABLE_STALE-       //ldc:do extra efforts时,保留10%的过期key
                                     effort;
 
     /* This function has some global state in order to continue the work
@@ -132,7 +132,7 @@ void activeExpireCycle(int type) {
     static long long last_fast_cycle = 0; /* When last fast cycle ran. */
 
     int j, iteration = 0;
-    int dbs_per_call = CRON_DBS_PER_CALL;
+    int dbs_per_call = CRON_DBS_PER_CALL;       //ldc:默认每次循环16个db
     long long start = ustime(), timelimit, elapsed;
 
     /* When clients are paused the dataset should be static not just from the
@@ -169,7 +169,7 @@ void activeExpireCycle(int type) {
      * time per iteration. Since this function gets called with a frequency of
      * server.hz times per second, the following is the max amount of
      * microseconds we can spend in this function. */
-    timelimit = config_cycle_slow_time_perc*1000000/server.hz/100;
+    timelimit = config_cycle_slow_time_perc*1000000/server.hz/100;      //ldc:默认activeExpireCycle限时运行25ms
     timelimit_exit = 0;
     if (timelimit <= 0) timelimit = 1;
 
@@ -188,7 +188,7 @@ void activeExpireCycle(int type) {
     server.core_propagates = 1;
     server.propagate_no_multi = 1;
 
-    for (j = 0; j < dbs_per_call && timelimit_exit == 0; j++) {
+    for (j = 0; j < dbs_per_call && timelimit_exit == 0; j++) {     //ldc:默认每次循环16个db,如果超时则退出循环
         /* Expired and checked in a single loop. */
         unsigned long expired, sampled;
 
@@ -203,14 +203,14 @@ void activeExpireCycle(int type) {
          * a big percentage of keys to expire, compared to the number of keys
          * we scanned. The percentage, stored in config_cycle_acceptable_stale
          * is not fixed, but depends on the Redis configured "expire effort". */
-        do {
-            unsigned long num, slots;
+        do {        //ldc:循环,直至:采样为0 或者 expired/sampled的百分比>config_cycle_acceptable_stale
+            unsigned long num, slots;       //ldc:num:db->expires元素个数, slots:db->expires的hash槽个数
             long long now, ttl_sum;
             int ttl_samples;
             iteration++;
 
             /* If there is nothing to expire try next DB ASAP. */
-            if ((num = dictSize(db->expires)) == 0) {
+            if ((num = dictSize(db->expires)) == 0) {       //ldc:如果db->expires为空,则检查下一个DB
                 db->avg_ttl = 0;
                 break;
             }
@@ -220,13 +220,13 @@ void activeExpireCycle(int type) {
             /* When there are less than 1% filled slots, sampling the key
              * space is expensive, so stop here waiting for better times...
              * The dictionary will be resized asap. */
-            if (slots > DICT_HT_INITIAL_SIZE &&
+            if (slots > DICT_HT_INITIAL_SIZE &&     //ldc:如果元素个数/slots 小于1%,则跳出
                 (num*100/slots < 1)) break;
 
             /* The main collection cycle. Sample random keys among keys
              * with an expire set, checking for expired ones. */
-            expired = 0;
-            sampled = 0;
+            expired = 0;        //ldc:扫描判断是过期元素的个数
+            sampled = 0;        //ldc:扫描元素的个数
             ttl_sum = 0;
             ttl_samples = 0;
 
@@ -247,24 +247,24 @@ void activeExpireCycle(int type) {
             long checked_buckets = 0;
 
             while (sampled < num && checked_buckets < max_buckets) {
-                for (int table = 0; table < 2; table++) {
+                for (int table = 0; table < 2; table++) {       //ldc:遍历两个table,内嵌遍历整个槽
                     if (table == 1 && !dictIsRehashing(db->expires)) break;
 
                     unsigned long idx = db->expires_cursor;
                     idx &= DICTHT_SIZE_MASK(db->expires->ht_size_exp[table]);
-                    dictEntry *de = db->expires->ht_table[table][idx];
+                    dictEntry *de = db->expires->ht_table[table][idx];      //ldc:获取从哪个槽开始遍历
                     long long ttl;
 
                     /* Scan the current bucket of the current table. */
                     checked_buckets++;
-                    while(de) {
+                    while(de) {     //ldc:遍历整个槽
                         /* Get the next entry now since this entry may get
                          * deleted. */
                         dictEntry *e = de;
                         de = de->next;
 
                         ttl = dictGetSignedIntegerVal(e)-now;
-                        if (activeExpireCycleTryExpire(db,e,now)) expired++;
+                        if (activeExpireCycleTryExpire(db,e,now)) expired++;      //ldc:删除过期的key然后广播
                         if (ttl > 0) {
                             /* We want the average TTL of keys yet
                              * not expired. */

@@ -466,10 +466,10 @@ static int evictionTimeProc(
     return AE_NOMORE;
 }
 
-void startEvictionTimeProc(void) {
+void startEvictionTimeProc(void) {      //ldc:如果达到了单次处理时间限制，就创建时间事件，主线程下一次轮询时处理
     if (!isEvictionProcRunning) {
         isEvictionProcRunning = 1;
-        aeCreateTimeEvent(server.el, 0,
+        aeCreateTimeEvent(server.el, 0,     //ldc:如果达到了单次处理时间限制，就创建时间事件，主线程下一次轮询时处理
                 evictionTimeProc, NULL, NULL);
     }
 }
@@ -660,7 +660,7 @@ int performEvictions(void) {
         }
 
         /* Finally remove the selected key. */
-        if (bestkey) {
+        if (bestkey) {      //ldc:删除选定的 keys
             db = server.db+bestdbid;
             robj *keyobj = createStringObject(bestkey,sdslen(bestkey));
             /* We compute the amount of memory freed by db*Delete() alone.
@@ -714,9 +714,9 @@ int performEvictions(void) {
                 /* After some time, exit the loop early - even if memory limit
                  * hasn't been reached.  If we suddenly need to free a lot of
                  * memory, don't want to spend too much time here.  */
-                if (elapsedUs(evictionTimer) > eviction_time_limit_us) {
+                if (elapsedUs(evictionTimer) > eviction_time_limit_us) {        //ldc:限制单次处理时长，避免长时间在此阻塞
                     // We still need to free memory - start eviction timer proc
-                    startEvictionTimeProc();
+                    startEvictionTimeProc();        //ldc:如果达到了单次处理时间限制，就创建时间事件，主线程下一次轮询时处理
                     break;
                 }
             }

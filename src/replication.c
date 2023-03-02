@@ -2869,9 +2869,9 @@ write_error: /* Handle sendCommand() errors. */
     goto error;
 }
 
-int connectWithMaster(void) {
-    server.repl_transfer_s = server.tls_replication ? connCreateTLS() : connCreateSocket();
-    if (connConnect(server.repl_transfer_s, server.masterhost, server.masterport,
+int connectWithMaster(void) {       //ldc:slave 连接到 master服务器
+    server.repl_transfer_s = server.tls_replication ? connCreateTLS() : connCreateSocket();     //ldc:创建connection
+    if (connConnect(server.repl_transfer_s, server.masterhost, server.masterport,       //ldc:连接到master
                 server.bind_source_addr, syncWithMaster) == C_ERR) {
         serverLog(LL_WARNING,"Unable to connect to MASTER: %s",
                 connGetLastError(server.repl_transfer_s));
@@ -2883,7 +2883,7 @@ int connectWithMaster(void) {
 
     server.repl_transfer_lastio = server.unixtime;
     server.repl_state = REPL_STATE_CONNECTING;
-    serverLog(LL_NOTICE,"MASTER <-> REPLICA sync started");
+    serverLog(LL_NOTICE,"MASTER <-> REPLICA sync started");     //ldc:打印* MASTER <-> REPLICA sync started
     return C_OK;
 }
 
@@ -3077,10 +3077,10 @@ void replicationHandleMasterDisconnection(void) {
     }
 }
 
-void replicaofCommand(client *c) {
+void replicaofCommand(client *c) {      //ldc:处理slaveof命令
     /* SLAVEOF is not allowed in cluster mode as replication is automatically
      * configured using the current address of the master node. */
-    if (server.cluster_enabled) {
+    if (server.cluster_enabled) {       //ldc:集群模式下禁止使用复制功能
         addReplyError(c,"REPLICAOF not allowed in cluster mode.");
         return;
     }
@@ -3095,7 +3095,7 @@ void replicaofCommand(client *c) {
     if (!strcasecmp(c->argv[1]->ptr,"no") &&
         !strcasecmp(c->argv[2]->ptr,"one")) {
         if (server.masterhost) {
-            replicationUnsetMaster();
+            replicationUnsetMaster();       //ldc:使用slaveof no one命令可以中断主从之间的关系,之前同步的数据不会被清空
             sds client = catClientInfoString(sdsempty(),c);
             serverLog(LL_NOTICE,"MASTER MODE enabled (user request from '%s')",
                 client);
@@ -3113,12 +3113,12 @@ void replicaofCommand(client *c) {
             return;
         }
 
-        if (getRangeLongFromObjectOrReply(c, c->argv[2], 0, 65535, &port,
+        if (getRangeLongFromObjectOrReply(c, c->argv[2], 0, 65535, &port,       //ldc:读取参数中master的端口号
                                           "Invalid master port") != C_OK)
             return;
 
         /* Check if we are already attached to the specified master */
-        if (server.masterhost && !strcasecmp(server.masterhost,c->argv[1]->ptr)
+        if (server.masterhost && !strcasecmp(server.masterhost,c->argv[1]->ptr)     //ldc:检查我们是否已经slaveof到指定的主服务器
             && server.masterport == port) {
             serverLog(LL_NOTICE,"REPLICAOF would result into synchronization "
                                 "with the master we are already connected "
@@ -3129,13 +3129,13 @@ void replicaofCommand(client *c) {
         }
         /* There was no previous master or the user specified a different one,
          * we can continue. */
-        replicationSetMaster(c->argv[1]->ptr, port);
-        sds client = catClientInfoString(sdsempty(),c);
+        replicationSetMaster(c->argv[1]->ptr, port);        //ldc:这函数将主服务的host和port属性存储到masterhost和masterport属性中
+        sds client = catClientInfoString(sdsempty(),c);     //ldc:获取客户端信息； catClientInfoString是以字符串格式 获取客户端信息
         serverLog(LL_NOTICE,"REPLICAOF %s:%d enabled (user request from '%s')",
             server.masterhost, server.masterport, client);
         sdsfree(client);
     }
-    addReply(c,shared.ok);
+    addReply(c,shared.ok);      //ldc:回复ok
 }
 
 /* ROLE command: provide information about the role of the instance
@@ -3585,16 +3585,16 @@ void replicationCron(void) {
     }
 
     /* Check if we should connect to a MASTER */
-    if (server.repl_state == REPL_STATE_CONNECT) {
+    if (server.repl_state == REPL_STATE_CONNECT) {      //ldc:slaveof后,1、连接master
         serverLog(LL_NOTICE,"Connecting to MASTER %s:%d",
-            server.masterhost, server.masterport);
-        connectWithMaster();
+            server.masterhost, server.masterport);      //ldc:打印* Connecting to MASTER 172.16.13.197:6379
+        connectWithMaster();        //ldc:slave 连接到 master服务器
     }
 
     /* Send ACK to master from time to time.
      * Note that we do not send periodic acks to masters that don't
      * support PSYNC and replication offsets. */
-    if (server.masterhost && server.master &&
+    if (server.masterhost && server.master &&      //ldc:slaveof后,1、连接master 2、发送ping命令检查套接字读写状态、服务器是否正常
         !(server.master->flags & CLIENT_PRE_PSYNC))
         replicationSendAck();
 
@@ -3731,7 +3731,7 @@ void replicationCron(void) {
 
     /* Remove the RDB file used for replication if Redis is not running
      * with any persistence. */
-    removeRDBUsedToSyncReplicas();
+    removeRDBUsedToSyncReplicas();      //ldc:如果不以persistence方式运行,则删除RDB
 
     /* Sanity check replication buffer, the first block of replication buffer blocks
      * must be referenced by someone, since it will be freed when not referenced,

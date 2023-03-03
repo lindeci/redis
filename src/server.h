@@ -1865,7 +1865,7 @@ struct redisServer {
     dict *pubsubshard_channels;  /* Map shard channels to list of subscribed clients */
     /* Cluster */
     int cluster_enabled;      /* Is cluster enabled? */      //ldc:是否开启cluster
-    int cluster_port;         /* Set the cluster port for a node. */      //ldc:cluster的端口
+    int cluster_port;         /* Set the cluster port for a node. */      //ldc:cluster端口
     mstime_t cluster_node_timeout; /* Cluster node timeout. */      //ldc:cluster节点的超时时间
     char *cluster_configfile; /* Cluster auto-generated config file name. */      //ldc:cluster的配置文件名
     struct clusterState *cluster;  /* State of the cluster */      //ldc:cluster状态

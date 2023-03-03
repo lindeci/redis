@@ -1085,90 +1085,90 @@ typedef struct {
 } clientMemUsageBucket;
 
 typedef struct client {
-    uint64_t id;            /* Client incremental unique ID. */
-    uint64_t flags;         /* Client flags: CLIENT_* macros. */
-    connection *conn;
-    int resp;               /* RESP protocol version. Can be 2 or 3. */
-    redisDb *db;            /* Pointer to currently SELECTed DB. */
-    robj *name;             /* As set by CLIENT SETNAME. */
+    uint64_t id;            /* Client incremental unique ID. */     //ldc:客户端递增的唯一ID
+    uint64_t flags;         /* Client flags: CLIENT_* macros. */        //ldc:CLIENT_SLAVE
+    connection *conn;       //ldc:connection
+    int resp;               /* RESP protocol version. Can be 2 or 3. */     //ldc:Redis Serialization Protocol 协议版本 2或者3
+    redisDb *db;            /* Pointer to currently SELECTed DB. */     //ldc:指向当前选择的数据库
+    robj *name;             /* As set by CLIENT SETNAME. */     //ldc:被客户端命令SETNAME设置的名字
     sds querybuf;           /* Buffer we use to accumulate client queries. */       //ldc:客户端请求buffer
     size_t qb_pos;          /* The position we have read in querybuf. */       //ldc:querybuf中的读取偏移量
     size_t querybuf_peak;   /* Recent (100ms or more) peak of querybuf size. */     //ldc:最近100毫秒内querybuf的峰值
-    int argc;               /* Num of arguments of current command. */
-    robj **argv;            /* Arguments of current command. */
-    int argv_len;           /* Size of argv array (may be more than argc) */
+    int argc;               /* Num of arguments of current command. */      //ldc:前命令的参数个数
+    robj **argv;            /* Arguments of current command. */     //ldc:当前命令的实际参数
+    int argv_len;           /* Size of argv array (may be more than argc) */        //ldc:argv的长度
     int original_argc;      /* Num of arguments of original command if arguments were rewritten. */
     robj **original_argv;   /* Arguments of original command if arguments were rewritten. */
     size_t argv_len_sum;    /* Sum of lengths of objects in argv list. */
-    struct redisCommand *cmd, *lastcmd;  /* Last command executed. */
+    struct redisCommand *cmd, *lastcmd;  /* Last command executed. */       //ldc:最后一个执行的命令
     struct redisCommand *realcmd; /* The original command that was executed by the client,
                                      Used to update error stats in case the c->cmd was modified
                                      during the command invocation (like on GEOADD for example). */
     user *user;             /* User associated with this connection. If the
                                user is set to NULL the connection can do
-                               anything (admin). */
-    int reqtype;            /* Request protocol type: PROTO_REQ_* */
-    int multibulklen;       /* Number of multi bulk arguments left to read. */
-    long bulklen;           /* Length of bulk argument in multi bulk request. */
-    list *reply;            /* List of reply objects to send to the client. */      //ldc:返回给client的objects列表
+                               anything (admin). */     //ldc:连接关联的用户，如果用户被设置为空，那么连接可以干任何时期(因为是管理员)
+    int reqtype;            /* Request protocol type: PROTO_REQ_* */        //ldc:请求协议类型PROTO_REQ_*
+    int multibulklen;       /* Number of multi bulk arguments left to read. */      //ldc:剩余要读取的多批量参数的个数
+    long bulklen;           /* Length of bulk argument in multi bulk request. */        //ldc:批量请求中批量参数的长度
+    list *reply;            /* List of reply objects to send to the client. */      //ldc:返回给client的objects列表. buf首选的写出缓冲区，固定大小 16KB.如果客户端在时间窗口内响应的数据非常大，则会自动切换到 client->reply链表
     unsigned long long reply_bytes; /* Tot bytes of objects in reply list. */       //ldc:replay list的总字节长度
     list *deferred_reply_errors;    /* Used for module thread safe contexts. */
-    size_t sentlen;         /* Amount of bytes already sent in the current
+    size_t sentlen;         /* Amount of bytes already sent in the current      //ldc:当前缓冲区已经发出的或者正在发送对象的字节大小
                                buffer or object being sent. */
-    time_t ctime;           /* Client creation time. */
+    time_t ctime;           /* Client creation time. */     //ldc:客户端创建时间
     long duration;          /* Current command duration. Used for measuring latency of blocking/non-blocking cmds */
-    int slot;               /* The slot the client is executing against. Set to -1 if no slot is being used */
+    int slot;               /* The slot the client is executing against. Set to -1 if no slot is being used */      //ldc:client正在处理的slot
     dictEntry *cur_script;  /* Cached pointer to the dictEntry of the script being executed. */
-    time_t lastinteraction; /* Time of the last interaction, used for timeout */
-    time_t obuf_soft_limit_reached_time;
-    int authenticated;      /* Needed when the default user requires auth. */
-    int replstate;          /* Replication state if this is a slave. */
+    time_t lastinteraction; /* Time of the last interaction, used for timeout */        //ldc:上次交互时间，用于过期判断
+    time_t obuf_soft_limit_reached_time;        //ldc:输出缓存软性限制大小到达时间
+    int authenticated;      /* Needed when the default user requires auth. */       //ldc:当默认用户需要认证时就需要
+    int replstate;          /* Replication state if this is a slave. */     //ldc:从库状态
     int repl_start_cmd_stream_on_ack; /* Install slave write handler on first ACK. */
-    int repldbfd;           /* Replication DB file descriptor. */
-    off_t repldboff;        /* Replication DB file offset. */
-    off_t repldbsize;       /* Replication DB file size. */
-    sds replpreamble;       /* Replication DB preamble. */
-    long long read_reploff; /* Read replication offset if this is a master. */
-    long long reploff;      /* Applied replication offset if this is a master. */
-    long long repl_applied; /* Applied replication data count in querybuf, if this is a replica. */
-    long long repl_ack_off; /* Replication ack offset, if this is a slave. */
-    long long repl_ack_time;/* Replication ack time, if this is a slave. */
+    int repldbfd;           /* Replication DB file descriptor. */       //ldc:从库fd
+    off_t repldboff;        /* Replication DB file offset. */       //ldc:从库文件偏移量
+    off_t repldbsize;       /* Replication DB file size. */     //ldc:从库文件大小
+    sds replpreamble;       /* Replication DB preamble. */      //ldc:repl序言
+    long long read_reploff; /* Read replication offset if this is a master. */      //ldc:如果这是master,代表读取复制偏移量
+    long long reploff;      /* Applied replication offset if this is a master. */       //ldc:      //ldc:如果这是master,代表应用复制偏移量
+    long long repl_applied; /* Applied replication data count in querybuf, if this is a replica. */     //ldc:如果是从库,表示应用的字节数
+    long long repl_ack_off; /* Replication ack offset, if this is a slave. */       //ldc:如果是slave,代表ack的偏移量
+    long long repl_ack_time;/* Replication ack time, if this is a slave. */     //ldc:如果是slave,代表ack的时间
     long long repl_last_partial_write; /* The last time the server did a partial write from the RDB child pipe to this replica  */
-    long long psync_initial_offset; /* FULLRESYNC reply offset other slaves
+    long long psync_initial_offset; /* FULLRESYNC reply offset other slaves     //ldc:其它slave从这儿FULLRESYNC的offset
                                        copying this slave output buffer
                                        should use. */
-    char replid[CONFIG_RUN_ID_SIZE+1]; /* Master replication ID (if master). */
-    int slave_listening_port; /* As configured with: REPLCONF listening-port */
-    char *slave_addr;       /* Optionally given by REPLCONF ip-address */
-    int slave_capa;         /* Slave capabilities: SLAVE_CAPA_* bitwise OR. */
-    int slave_req;          /* Slave requirements: SLAVE_REQ_* */
-    multiState mstate;      /* MULTI/EXEC state */
-    int btype;              /* Type of blocking op if CLIENT_BLOCKED. */
-    blockingState bpop;     /* blocking state */
-    long long woff;         /* Last write global replication offset. */
-    list *watched_keys;     /* Keys WATCHED for MULTI/EXEC CAS */
-    dict *pubsub_channels;  /* channels a client is interested in (SUBSCRIBE) */
-    list *pubsub_patterns;  /* patterns a client is interested in (SUBSCRIBE) */
+    char replid[CONFIG_RUN_ID_SIZE+1]; /* Master replication ID (if master). */     //ldc:如果是master，则表示replication ID
+    int slave_listening_port; /* As configured with: REPLCONF listening-port */     //ldc:slave的监听端口
+    char *slave_addr;       /* Optionally given by REPLCONF ip-address */       //ldc:slave 地址
+    int slave_capa;         /* Slave capabilities: SLAVE_CAPA_* bitwise OR. */      //ldc:slave 能力:SLAVE_CAPA_NONE、SLAVE_CAPA_EOF、SLAVE_CAPA_PSYNC2
+    int slave_req;          /* Slave requirements: SLAVE_REQ_* */       //ldc:slave的请求类型 SLAVE_REQ_NONE、SLAVE_REQ_RDB_EXCLUDE_DATA、SLAVE_REQ_RDB_EXCLUDE_FUNCTIONS、SLAVE_REQ_RDB_MASK
+    multiState mstate;      /* MULTI/EXEC state */      //ldc:事务状态
+    int btype;              /* Type of blocking op if CLIENT_BLOCKED. */        //ldc:阻塞类型
+    blockingState bpop;     /* blocking state */        //ldc:阻塞状态
+    long long woff;         /* Last write global replication offset. */     //ldc:最近一次全局复制的偏移量
+    list *watched_keys;     /* Keys WATCHED for MULTI/EXEC CAS */       //ldc:通过事务总线监视的键的列表
+    dict *pubsub_channels;  /* channels a client is interested in (SUBSCRIBE) */        //ldc:客户感兴趣的频道（订阅）
+    list *pubsub_patterns;  /* patterns a client is interested in (SUBSCRIBE) */        //ldc:客户感兴趣的模式（订阅）
     dict *pubsubshard_channels;  /* shard level channels a client is interested in (SSUBSCRIBE) */
     sds peerid;             /* Cached peer ID. */
     sds sockname;           /* Cached connection target address. */
-    listNode *client_list_node; /* list node in client list */
+    listNode *client_list_node; /* list node in client list */      //ldc:客户端列表的节点
     listNode *postponed_list_node; /* list node within the postponed list */
     listNode *pending_read_list_node; /* list node in clients pending read list */
-    RedisModuleUserChangedFunc auth_callback; /* Module callback to execute
+    RedisModuleUserChangedFunc auth_callback; /* Module callback to execute     //ldc:当认证用户改变时，需要回调执行的模块
                                                * when the authenticated user
                                                * changes. */
-    void *auth_callback_privdata; /* Private data that is passed when the auth
+    void *auth_callback_privdata; /* Private data that is passed when the auth      //ldc:执行认证改变回调时传递的私有数据。对Redis核心隐藏
                                    * changed callback is executed. Opaque for
                                    * Redis Core. */
-    void *auth_module;      /* The module that owns the callback, which is used
+    void *auth_module;      /* The module that owns the callback, which is used     //ldc:授权的模块,拥有auth_callback
                              * to disconnect the client if the module is
                              * unloaded for cleanup. Opaque for Redis Core.*/
 
     /* If this client is in tracking mode and this field is non zero,
      * invalidation messages for keys fetched by this client will be send to
      * the specified client ID. */
-    uint64_t client_tracking_redirection;
+    uint64_t client_tracking_redirection;       //ldc:如果这个客户端处于跟踪模式，那么这个字段就不为0
     rax *client_tracking_prefixes; /* A dictionary of prefixes we are already
                                       subscribed to in BCAST mode, in the
                                       context of client side caching. */
@@ -1177,11 +1177,11 @@ typedef struct client {
      * however we need to remember what was the old contribution of each
      * client, and in which category the client was, in order to remove it
      * before adding it the new value. */
-    size_t last_memory_usage;
-    int last_memory_type;
+    size_t last_memory_usage;       //ldc:上次使用的内存大小
+    int last_memory_type;       //ldc:上次使用内存类型
 
-    listNode *mem_usage_bucket_node;
-    clientMemUsageBucket *mem_usage_bucket;
+    listNode *mem_usage_bucket_node;        //ldc:某个桶的内存使用大小
+    clientMemUsageBucket *mem_usage_bucket;        //ldc:某个client list桶的内存使用大小
 
     listNode *ref_repl_buf_node; /* Referenced node of replication buffer blocks,
                                   * see the definition of replBufBlock. */
@@ -1221,7 +1221,7 @@ struct sentinelConfig {
 };
 
 struct sharedObjectsStruct {
-    robj *crlf, *ok, *err, *emptybulk, *czero, *cone, *pong, *space,
+    robj *crlf, *ok, *err, *emptybulk, *czero, *cone, *pong, *space,        //ldc: crlf:\r\n
     *queued, *null[4], *nullarray[4], *emptymap[4], *emptyset[4],
     *emptyarray, *wrongtypeerr, *nokeyerr, *syntaxerr, *sameobjecterr,
     *outofrangeerr, *noscripterr, *loadingerr,
@@ -1452,47 +1452,47 @@ typedef enum childInfoType {
 
 struct redisServer {
     /* General */
-    pid_t pid;                  /* Main process pid. */
-    pthread_t main_thread_id;         /* Main thread id */
-    char *configfile;           /* Absolute config file path, or NULL */
-    char *executable;           /* Absolute executable file path. */
-    char **exec_argv;           /* Executable argv vector (copy). */
-    int dynamic_hz;             /* Change hz value depending on # of clients. */
-    int config_hz;              /* Configured HZ value. May be different than
+    pid_t pid;                  /* Main process pid. */       //ldc:进程ID
+    pthread_t main_thread_id;         /* Main thread id */       //ldc:主线程ID
+    char *configfile;           /* Absolute config file path, or NULL */       //ldc:配置文件路径
+    char *executable;           /* Absolute executable file path. */       //ldc:可运行的配置文件路径
+    char **exec_argv;           /* Executable argv vector (copy). */       //ldc:执行命令
+    int dynamic_hz;             /* Change hz value depending on # of clients. */       //ldc:动态频率
+    int config_hz;              /* Configured HZ value. May be different than       //ldc:配置的频率
                                    the actual 'hz' field value if dynamic-hz
                                    is enabled. */
-    mode_t umask;               /* The umask value of the process on startup */
-    int hz;                     /* serverCron() calls frequency in hertz */
-    int in_fork_child;          /* indication that this is a fork child */
-    redisDb *db;
-    dict *commands;             /* Command table */
-    dict *orig_commands;        /* Command table before command renaming. */
-    aeEventLoop *el;
-    rax *errors;                /* Errors table */
-    redisAtomic unsigned int lruclock; /* Clock for LRU eviction */
+    mode_t umask;               /* The umask value of the process on startup */       //ldc:进程权限掩码
+    int hz;                     /* serverCron() calls frequency in hertz */       //ldc:频率
+    int in_fork_child;          /* indication that this is a fork child */       //ldc:是否是子进程
+    redisDb *db;       //ldc:DB数组
+    dict *commands;             /* Command table */       //ldc:命令字典
+    dict *orig_commands;        /* Command table before command renaming. */       //ldc:原始命令字典
+    aeEventLoop *el;       //ldc:循环事件
+    rax *errors;                /* Errors table */       //ldc:rax错误表
+    redisAtomic unsigned int lruclock; /* Clock for LRU eviction */       //ldc:LRU原子锁
     volatile sig_atomic_t shutdown_asap; /* Shutdown ordered by signal handler. */
-    mstime_t shutdown_mstime;   /* Timestamp to limit graceful shutdown. */
-    int last_sig_received;      /* Indicates the last SIGNAL received, if any (e.g., SIGINT or SIGTERM). */
-    int shutdown_flags;         /* Flags passed to prepareForShutdown(). */
-    int activerehashing;        /* Incremental rehash in serverCron() */
-    int active_defrag_running;  /* Active defragmentation running (holds current scan aggressiveness) */
-    char *pidfile;              /* PID file path */
-    int arch_bits;              /* 32 or 64 depending on sizeof(long) */
-    int cronloops;              /* Number of times the cron function run */
-    char runid[CONFIG_RUN_ID_SIZE+1];  /* ID always different at every exec. */
-    int sentinel_mode;          /* True if this instance is a Sentinel. */
-    size_t initial_memory_usage; /* Bytes used after initialization. */
-    int always_show_logo;       /* Show logo even for non-stdout logging. */
-    int in_exec;                /* Are we inside EXEC? */
-    int busy_module_yield_flags;         /* Are we inside a busy module? (triggered by RM_Yield). see BUSY_MODULE_YIELD_ flags. */
-    const char *busy_module_yield_reply; /* When non-null, we are inside RM_Yield. */
-    int core_propagates;        /* Is the core (in oppose to the module subsystem) is in charge of calling propagatePendingCommands? */
-    int propagate_no_multi;     /* True if propagatePendingCommands should avoid wrapping command in MULTI/EXEC */
-    int module_ctx_nesting;     /* moduleCreateContext() nesting level */
-    char *ignore_warnings;      /* Config: warnings that should be ignored. */
-    int client_pause_in_transaction; /* Was a client pause executed during this Exec? */
-    int thp_enabled;                 /* If true, THP is enabled. */
-    size_t page_size;                /* The page size of OS. */
+    mstime_t shutdown_mstime;   /* Timestamp to limit graceful shutdown. */       //ldc:到期时间关闭
+    int last_sig_received;      /* Indicates the last SIGNAL received, if any (e.g., SIGINT or SIGTERM). */       //ldc:上次接受的信号
+    int shutdown_flags;         /* Flags passed to prepareForShutdown(). */       //ldc:是否准备关闭的标志
+    int activerehashing;        /* Incremental rehash in serverCron() */       //ldc:是否正在rehash
+    int active_defrag_running;  /* Active defragmentation running (holds current scan aggressiveness) */       //ldc:是否正在整理碎片
+    char *pidfile;              /* PID file path */       //ldc:pid文件路径
+    int arch_bits;              /* 32 or 64 depending on sizeof(long) */       //ldc:32或64位架构
+    int cronloops;              /* Number of times the cron function run */       //ldc:时间事件次数
+    char runid[CONFIG_RUN_ID_SIZE+1];  /* ID always different at every exec. */       //ldc:运行ID,每次事务中不一样
+    int sentinel_mode;          /* True if this instance is a Sentinel. */       //ldc:是否哨兵模式
+    size_t initial_memory_usage; /* Bytes used after initialization. */       //ldc:初始化后的内存使用大小
+    int always_show_logo;       /* Show logo even for non-stdout logging. */       //ldc:是否打印LOG
+    int in_exec;                /* Are we inside EXEC? */       //ldc:是否在事务中
+    int busy_module_yield_flags;         /* Are we inside a busy module? (triggered by RM_Yield). see BUSY_MODULE_YIELD_ flags. */       //ldc:BUSY_MODULE_YIELD_NONE、BUSY_MODULE_YIELD_EVENTS、BUSY_MODULE_YIELD_CLIENTS
+    const char *busy_module_yield_reply; /* When non-null, we are inside RM_Yield. */       //ldc:
+    int core_propagates;        /* Is the core (in oppose to the module subsystem) is in charge of calling propagatePendingCommands? */     //ldc:是否在调用propagatePendingCommands
+    int propagate_no_multi;     /* True if propagatePendingCommands should avoid wrapping command in MULTI/EXEC */      //ldc:propagatePendingCommands是否需要封装MULTI/EXEC命令(事务)
+    int module_ctx_nesting;     /* moduleCreateContext() nesting level */       //ldc:组件创建上下文深度
+    char *ignore_warnings;      /* Config: warnings that should be ignored. */       //ldc:忽略告警
+    int client_pause_in_transaction; /* Was a client pause executed during this Exec? */       //ldc:是否有客户端因为这个事务导致阻塞
+    int thp_enabled;                 /* If true, THP is enabled. */       //ldc:是否允许透明大页
+    size_t page_size;                /* The page size of OS. */       //ldc:OS的页大小
     /* Modules */
     dict *moduleapi;            /* Exported core APIs dictionary for modules. */
     dict *sharedapi;            /* Like moduleapi but containing the APIs that
@@ -1503,116 +1503,116 @@ struct redisServer {
     pid_t child_pid;            /* PID of current child */
     int child_type;             /* Type of current child */
     /* Networking */
-    int port;                   /* TCP listening port */
-    int tls_port;               /* TLS listening port */
-    int tcp_backlog;            /* TCP listen() backlog */
-    char *bindaddr[CONFIG_BINDADDR_MAX]; /* Addresses we should bind to */
-    int bindaddr_count;         /* Number of addresses in server.bindaddr[] */
-    char *bind_source_addr;     /* Source address to bind on for outgoing connections */
-    char *unixsocket;           /* UNIX socket path */
-    unsigned int unixsocketperm; /* UNIX socket permission (see mode_t) */
-    socketFds ipfd;             /* TCP socket file descriptors */
-    socketFds tlsfd;            /* TLS socket file descriptors */
-    int sofd;                   /* Unix socket file descriptor */
+    int port;                   /* TCP listening port */       //ldc:TCP监听端口
+    int tls_port;               /* TLS listening port */       //ldc:TLS监听端口
+    int tcp_backlog;            /* TCP listen() backlog */       //ldc:TCP的backlog(等待连接队列)
+    char *bindaddr[CONFIG_BINDADDR_MAX]; /* Addresses we should bind to */       //ldc:绑定的IP地址列表
+    int bindaddr_count;         /* Number of addresses in server.bindaddr[] */       //ldc:绑定的IP地址个数
+    char *bind_source_addr;     /* Source address to bind on for outgoing connections */       //ldc:远程访问的地址
+    char *unixsocket;           /* UNIX socket path */       //ldc:UNIX socket路径
+    unsigned int unixsocketperm; /* UNIX socket permission (see mode_t) */       //ldc:UNIX socket的权限
+    socketFds ipfd;             /* TCP socket file descriptors */       //ldc:TCP的socket id
+    socketFds tlsfd;            /* TLS socket file descriptors */       //ldc:TLS的socket id
+    int sofd;                   /* Unix socket file descriptor */       //ldc:Unix的socket id
     uint32_t socket_mark_id;    /* ID for listen socket marking */
-    socketFds cfd;              /* Cluster bus listening socket */
-    list *clients;              /* List of active clients */
-    list *clients_to_close;     /* Clients to close asynchronously */
-    list *clients_pending_write; /* There is to write or install handler. */
-    list *clients_pending_read;  /* Client has pending read socket buffers. */
-    list *slaves, *monitors;    /* List of slaves and MONITORs */
-    client *current_client;     /* Current client executing the command. */
+    socketFds cfd;              /* Cluster bus listening socket */       //ldc:Cluster监听的socket
+    list *clients;              /* List of active clients */       //ldc:活动的clients
+    list *clients_to_close;     /* Clients to close asynchronously */       //ldc:等待异步关闭的clients
+    list *clients_pending_write; /* There is to write or install handler. */        //ldc:有待写返回数据的 clients列表
+    list *clients_pending_read;  /* Client has pending read socket buffers. */       //ldc:有待读取数据的 clients列表
+    list *slaves, *monitors;    /* List of slaves and MONITORs */       //ldc:slaves列表、monitor列表
+    client *current_client;     /* Current client executing the command. */     //ldc:执行当前命令的客户端
 
     /* Stuff for client mem eviction */
     clientMemUsageBucket* client_mem_usage_buckets;
 
-    rax *clients_timeout_table; /* Radix tree for blocked clients timeouts. */
+    rax *clients_timeout_table; /* Radix tree for blocked clients timeouts. */      //ldc:阻塞的客户端的超时时间
     long fixed_time_expire;     /* If > 0, expire keys against server.mstime. */
     int in_nested_call;         /* If > 0, in a nested call of a call */
-    rax *clients_index;         /* Active clients dictionary by client ID. */
-    pause_type client_pause_type;      /* True if clients are currently paused */
-    list *postponed_clients;       /* List of postponed clients */
-    mstime_t client_pause_end_time;    /* Time when we undo clients_paused */
-    pause_event *client_pause_per_purpose[NUM_PAUSE_PURPOSES];
-    char neterr[ANET_ERR_LEN];   /* Error buffer for anet.c */
-    dict *migrate_cached_sockets;/* MIGRATE cached sockets */
-    redisAtomic uint64_t next_client_id; /* Next client unique ID. Incremental. */
-    int protected_mode;         /* Don't accept external connections. */
-    int io_threads_num;         /* Number of IO threads to use. */
-    int io_threads_do_reads;    /* Read and parse from IO threads? */
-    int io_threads_active;      /* Is IO threads currently active? */
-    long long events_processed_while_blocked; /* processEventsWhileBlocked() */
-    int enable_protected_configs;    /* Enable the modification of protected configs, see PROTECTED_ACTION_ALLOWED_* */
-    int enable_debug_cmd;            /* Enable DEBUG commands, see PROTECTED_ACTION_ALLOWED_* */
-    int enable_module_cmd;           /* Enable MODULE commands, see PROTECTED_ACTION_ALLOWED_* */
+    rax *clients_index;         /* Active clients dictionary by client ID. */      //ldc:活跃客户端列表的rax结构
+    pause_type client_pause_type;      /* True if clients are currently paused */       //ldc:客户端停止类型 CLIENT_PAUSE_OFF、CLIENT_PAUSE_WRITE、CLIENT_PAUSE_ALL 
+    list *postponed_clients;       /* List of postponed clients */      //ldc:延期的客户端列表
+    mstime_t client_pause_end_time;    /* Time when we undo clients_paused */      //ldc:客户端解除停止的截至时间
+    pause_event *client_pause_per_purpose[NUM_PAUSE_PURPOSES];      //ldc:导致客户端停止的事件 CLIENT_PAUSE_OFF、CLIENT_PAUSE_WRITE、CLIENT_PAUSE_ALL 
+    char neterr[ANET_ERR_LEN];   /* Error buffer for anet.c */      //ldc:anet.c中的Error buffer
+    dict *migrate_cached_sockets;/* MIGRATE cached sockets */       //ldc:缓存sockets,避免频繁创建socket
+    redisAtomic uint64_t next_client_id; /* Next client unique ID. Incremental. */      //ldc:下一个client id
+    int protected_mode;         /* Don't accept external connections. */        //ldc:是否允许远程访问
+    int io_threads_num;         /* Number of IO threads to use. */        //ldc:IO 线程个数
+    int io_threads_do_reads;    /* Read and parse from IO threads? */        //ldc:读、解析的IO线程个数
+    int io_threads_active;      /* Is IO threads currently active? */        //ldc:活跃线程个数
+    long long events_processed_while_blocked; /* processEventsWhileBlocked() */     //ldc:因为阻塞累计的event个数
+    int enable_protected_configs;    /* Enable the modification of protected configs, see PROTECTED_ACTION_ALLOWED_* */     //ldc:PROTECTED_ACTION_ALLOWED_NO、PROTECTED_ACTION_ALLOWED_YES、PROTECTED_ACTION_ALLOWED_LOCAL
+    int enable_debug_cmd;            /* Enable DEBUG commands, see PROTECTED_ACTION_ALLOWED_* */     //ldc:PROTECTED_ACTION_ALLOWED_NO、PROTECTED_ACTION_ALLOWED_YES、PROTECTED_ACTION_ALLOWED_LOCAL
+    int enable_module_cmd;           /* Enable MODULE commands, see PROTECTED_ACTION_ALLOWED_* */     //ldc:PROTECTED_ACTION_ALLOWED_NO、PROTECTED_ACTION_ALLOWED_YES、PROTECTED_ACTION_ALLOWED_LOCAL
 
     /* RDB / AOF loading information */
-    volatile sig_atomic_t loading; /* We are loading data from disk if true */
-    volatile sig_atomic_t async_loading; /* We are loading data without blocking the db being served */
-    off_t loading_total_bytes;
-    off_t loading_rdb_used_mem;
-    off_t loading_loaded_bytes;
-    time_t loading_start_time;
+    volatile sig_atomic_t loading; /* We are loading data from disk if true */      //ldc:同步加载
+    volatile sig_atomic_t async_loading; /* We are loading data without blocking the db being served */      //ldc:异步加载
+    off_t loading_total_bytes;      //ldc:需要加载的字节数
+    off_t loading_rdb_used_mem;      //ldc:RDB占用内存大小
+    off_t loading_loaded_bytes;      //ldc:已经加载字节数
+    time_t loading_start_time;      //ldc:加载开始事件
     off_t loading_process_events_interval_bytes;
     /* Fields used only for stats */
-    time_t stat_starttime;          /* Server start time */
-    long long stat_numcommands;     /* Number of processed commands */
-    long long stat_numconnections;  /* Number of connections received */
-    long long stat_expiredkeys;     /* Number of expired keys */
-    double stat_expired_stale_perc; /* Percentage of keys probably expired */
+    time_t stat_starttime;          /* Server start time */      //ldc:server启动时间
+    long long stat_numcommands;     /* Number of processed commands */      //ldc:已经处理的命令个数
+    long long stat_numconnections;  /* Number of connections received */      //ldc:已经接收的connetions个数
+    long long stat_expiredkeys;     /* Number of expired keys */      //ldc:过期keys个数
+    double stat_expired_stale_perc; /* Percentage of keys probably expired */      //ldc:过期的keys占比
     long long stat_expired_time_cap_reached_count; /* Early expire cycle stops.*/
-    long long stat_expire_cycle_time_used; /* Cumulative microseconds used. */
-    long long stat_evictedkeys;     /* Number of evicted keys (maxmemory) */
-    long long stat_evictedclients;  /* Number of evicted clients */
-    long long stat_total_eviction_exceeded_time;  /* Total time over the memory limit, unit us */
-    monotime stat_last_eviction_exceeded_time;  /* Timestamp of current eviction start, unit us */
-    long long stat_keyspace_hits;   /* Number of successful lookups of keys */
-    long long stat_keyspace_misses; /* Number of failed lookups of keys */
-    long long stat_active_defrag_hits;      /* number of allocations moved */
-    long long stat_active_defrag_misses;    /* number of allocations scanned but not moved */
-    long long stat_active_defrag_key_hits;  /* number of keys with moved allocations */
-    long long stat_active_defrag_key_misses;/* number of keys scanned and not moved */
-    long long stat_active_defrag_scanned;   /* number of dictEntries scanned */
-    long long stat_total_active_defrag_time; /* Total time memory fragmentation over the limit, unit us */
-    monotime stat_last_active_defrag_time; /* Timestamp of current active defrag start */
-    size_t stat_peak_memory;        /* Max used memory record */
-    long long stat_aof_rewrites;    /* number of aof file rewrites performed */
-    long long stat_aofrw_consecutive_failures; /* The number of consecutive failures of aofrw */
-    long long stat_rdb_saves;       /* number of rdb saves performed */
-    long long stat_fork_time;       /* Time needed to perform latest fork() */
-    double stat_fork_rate;          /* Fork rate in GB/sec. */
-    long long stat_total_forks;     /* Total count of fork. */
-    long long stat_rejected_conn;   /* Clients rejected because of maxclients */
-    long long stat_sync_full;       /* Number of full resyncs with slaves. */
-    long long stat_sync_partial_ok; /* Number of accepted PSYNC requests. */
-    long long stat_sync_partial_err;/* Number of unaccepted PSYNC requests. */
-    list *slowlog;                  /* SLOWLOG list of commands */
-    long long slowlog_entry_id;     /* SLOWLOG current entry ID */
-    long long slowlog_log_slower_than; /* SLOWLOG time limit (to get logged) */
-    unsigned long slowlog_max_len;     /* SLOWLOG max number of items logged */
-    struct malloc_stats cron_malloc_stats; /* sampled in serverCron(). */
-    redisAtomic long long stat_net_input_bytes; /* Bytes read from network. */
-    redisAtomic long long stat_net_output_bytes; /* Bytes written to network. */
-    redisAtomic long long stat_net_repl_input_bytes; /* Bytes read during replication, added to stat_net_input_bytes in 'info'. */
-    redisAtomic long long stat_net_repl_output_bytes; /* Bytes written during replication, added to stat_net_output_bytes in 'info'. */
-    size_t stat_current_cow_peak;   /* Peak size of copy on write bytes. */
-    size_t stat_current_cow_bytes;  /* Copy on write bytes while child is active. */
-    monotime stat_current_cow_updated;  /* Last update time of stat_current_cow_bytes */
-    size_t stat_current_save_keys_processed;  /* Processed keys while child is active. */
-    size_t stat_current_save_keys_total;  /* Number of keys when child started. */
-    size_t stat_rdb_cow_bytes;      /* Copy on write bytes during RDB saving. */
-    size_t stat_aof_cow_bytes;      /* Copy on write bytes during AOF rewrite. */
-    size_t stat_module_cow_bytes;   /* Copy on write bytes during module fork. */
+    long long stat_expire_cycle_time_used; /* Cumulative microseconds used. */      //ldc:过期keys处理的累计时长(微妙)
+    long long stat_evictedkeys;     /* Number of evicted keys (maxmemory) */      //ldc:累积淘汰的keys个数
+    long long stat_evictedclients;  /* Number of evicted clients */      //ldc:累计淘汰clients个数
+    long long stat_total_eviction_exceeded_time;  /* Total time over the memory limit, unit us */      //ldc:超过最大内存的累计时间(微秒)
+    monotime stat_last_eviction_exceeded_time;  /* Timestamp of current eviction start, unit us */      //ldc:当期淘汰开始的时间(微秒)
+    long long stat_keyspace_hits;   /* Number of successful lookups of keys */      //ldc:keys命中次数
+    long long stat_keyspace_misses; /* Number of failed lookups of keys */      //ldc:keys未命中次数
+    long long stat_active_defrag_hits;      /* number of allocations moved */      //ldc:调用moved次数
+    long long stat_active_defrag_misses;    /* number of allocations scanned but not moved */      //ldc:scan但未moved的次数
+    long long stat_active_defrag_key_hits;  /* number of keys with moved allocations */      //ldc:moved的keys个数
+    long long stat_active_defrag_key_misses;/* number of keys scanned and not moved */      //ldc:scan但未moved的keys个数
+    long long stat_active_defrag_scanned;   /* number of dictEntries scanned */      //ldc:dictentries scan次数
+    long long stat_total_active_defrag_time; /* Total time memory fragmentation over the limit, unit us */      //ldc:内存整理总超时时间(微秒)
+    monotime stat_last_active_defrag_time; /* Timestamp of current active defrag start */      //ldc:当前内存整理的开始时间
+    size_t stat_peak_memory;        /* Max used memory record */      //ldc:最大内存占用峰值
+    long long stat_aof_rewrites;    /* number of aof file rewrites performed */      //ldc:aof rewrites次数
+    long long stat_aofrw_consecutive_failures; /* The number of consecutive failures of aofrw */      //ldc:aofrw连续失败次数
+    long long stat_rdb_saves;       /* number of rdb saves performed */      //ldc:rdb save次数
+    long long stat_fork_time;       /* Time needed to perform latest fork() */      //ldc:最近一次fork的时间
+    double stat_fork_rate;          /* Fork rate in GB/sec. */      //ldc:fork的速度 GB/秒
+    long long stat_total_forks;     /* Total count of fork. */      //ldc:fork次数
+    long long stat_rejected_conn;   /* Clients rejected because of maxclients */      //ldc:因为超过最大连接数而拒绝连接请求次数
+    long long stat_sync_full;       /* Number of full resyncs with slaves. */      //ldc:slave full resyncs次数
+    long long stat_sync_partial_ok; /* Number of accepted PSYNC requests. */      //ldc:接收PSYNC次数
+    long long stat_sync_partial_err;/* Number of unaccepted PSYNC requests. */      //ldc:未接收的PSYNC次数
+    list *slowlog;                  /* SLOWLOG list of commands */      //ldc:慢日志命令列表
+    long long slowlog_entry_id;     /* SLOWLOG current entry ID */      //ldc:当前慢日志的entry ID
+    long long slowlog_log_slower_than; /* SLOWLOG time limit (to get logged) */      //ldc:慢日志的时间阈值
+    unsigned long slowlog_max_len;     /* SLOWLOG max number of items logged */      //ldc:慢日志长度
+    struct malloc_stats cron_malloc_stats; /* sampled in serverCron(). */      //ldc:定时任务的采样统计
+    redisAtomic long long stat_net_input_bytes; /* Bytes read from network. */      //ldc:从网络读取字节数
+    redisAtomic long long stat_net_output_bytes; /* Bytes written to network. */      //ldc:写回网络的字节数
+    redisAtomic long long stat_net_repl_input_bytes; /* Bytes read during replication, added to stat_net_input_bytes in 'info'. */      //ldc:replication从网络读取字节数
+    redisAtomic long long stat_net_repl_output_bytes; /* Bytes written during replication, added to stat_net_output_bytes in 'info'. */      //ldc:replication写回网络的字节数
+    size_t stat_current_cow_peak;   /* Peak size of copy on write bytes. */      //ldc:write bytes时copy峰值
+    size_t stat_current_cow_bytes;  /* Copy on write bytes while child is active. */      //ldc:当子进程活跃过程中，write bytes时的copy字节数
+    monotime stat_current_cow_updated;  /* Last update time of stat_current_cow_bytes */        //ldc:上次更新stat_current_cow_bytes的时间
+    size_t stat_current_save_keys_processed;  /* Processed keys while child is active. *//      //ldc:当子进程活跃过程中，处理的kyes个数
+    size_t stat_current_save_keys_total;  /* Number of keys when child started. *//      //ldc:当子进程启动时keys个数
+    size_t stat_rdb_cow_bytes;      /* Copy on write bytes during RDB saving. *//      //ldc:RDB saving过程中，write bytes时copy的字节数
+    size_t stat_aof_cow_bytes;      /* Copy on write bytes during AOF rewrite. */      //ldc:AOF rewrite过程中，write bytes时copy的字节数
+    size_t stat_module_cow_bytes;   /* Copy on write bytes during module fork. */      //ldc:module fork过程中，write bytes时copy的字节数
     double stat_module_progress;   /* Module save progress. */
-    size_t stat_clients_type_memory[CLIENT_TYPE_COUNT];/* Mem usage by type */
-    size_t stat_cluster_links_memory; /* Mem usage by cluster links */
-    long long stat_unexpected_error_replies; /* Number of unexpected (aof-loading, replica to master, etc.) error replies */
-    long long stat_total_error_replies; /* Total number of issued error replies ( command + rejected errors ) */
+    size_t stat_clients_type_memory[CLIENT_TYPE_COUNT];/* Mem usage by type */      //ldc:各种类型的客户端使用内存大小
+    size_t stat_cluster_links_memory; /* Mem usage by cluster links */      //ldc:cluster links占用内存大小
+    long long stat_unexpected_error_replies; /* Number of unexpected (aof-loading, replica to master, etc.) error replies */        //ldc:回复error(aof-loading, replica to master, etc.) 的次数
+    long long stat_total_error_replies; /* Total number of issued error replies ( command + rejected errors ) */        //ldc:回复error ( command + rejected errors )的次数
     long long stat_dump_payload_sanitizations; /* Number deep dump payloads integrity validations. */
-    long long stat_io_reads_processed; /* Number of read events processed by IO / Main threads */
-    long long stat_io_writes_processed; /* Number of write events processed by IO / Main threads */
-    redisAtomic long long stat_total_reads_processed; /* Total number of read events processed */
-    redisAtomic long long stat_total_writes_processed; /* Total number of write events processed */
+    long long stat_io_reads_processed; /* Number of read events processed by IO / Main threads */       //ldc:IO / Main threads 读事件次数
+    long long stat_io_writes_processed; /* Number of write events processed by IO / Main threads */       //ldc:IO / Main threads 写事件次数
+    redisAtomic long long stat_total_reads_processed; /* Total number of read events processed */       //ldc:读事件次数
+    redisAtomic long long stat_total_writes_processed; /* Total number of write events processed */       //ldc:写事件次数
     /* The following two are used to track instantaneous metrics, like
      * number of operations per second, network traffic. */
     struct {
@@ -1620,36 +1620,36 @@ struct redisServer {
         long long last_sample_count;/* Count in last sample */
         long long samples[STATS_METRIC_SAMPLES];
         int idx;
-    } inst_metric[STATS_METRIC_COUNT];
-    long long stat_reply_buffer_shrinks; /* Total number of output buffer shrinks */
-    long long stat_reply_buffer_expands; /* Total number of output buffer expands */
+    } inst_metric[STATS_METRIC_COUNT];      //ldc:STATS_METRIC_COMMAND、STATS_METRIC_NET_INPUT、STATS_METRIC_NET_OUTPUT、STATS_METRIC_NET_INPUT_REPLICATION、STATS_METRIC_NET_OUTPUT_REPLICATION
+    long long stat_reply_buffer_shrinks; /* Total number of output buffer shrinks */        //ldc:output buffer 收缩次数
+    long long stat_reply_buffer_expands; /* Total number of output buffer expands */        //ldc:output buffer 扩容次数
 
     /* Configuration */
-    int verbosity;                  /* Loglevel in redis.conf */
-    int maxidletime;                /* Client timeout in seconds */
-    int tcpkeepalive;               /* Set SO_KEEPALIVE if non-zero. */
-    int active_expire_enabled;      /* Can be disabled for testing purposes. */
-    int active_expire_effort;       /* From 1 (default) to 10, active effort. */
-    int active_defrag_enabled;
+    int verbosity;                  /* Loglevel in redis.conf */        //ldc:Loglevel
+    int maxidletime;                /* Client timeout in seconds */     //ldc:Client timeout in seconds
+    int tcpkeepalive;               /* Set SO_KEEPALIVE if non-zero. */     //ldc:SO_KEEPALIVE
+    int active_expire_enabled;      /* Can be disabled for testing purposes. */     //ldc:关闭expire
+    int active_expire_effort;       /* From 1 (default) to 10, active effort. */     //ldc:expire的额外功
+    int active_defrag_enabled;      //ldc:关闭defrag
     int sanitize_dump_payload;      /* Enables deep sanitization for ziplist and listpack in RDB and RESTORE. */
-    int skip_checksum_validation;   /* Disable checksum validation for RDB and RESTORE payload. */
-    int jemalloc_bg_thread;         /* Enable jemalloc background thread */
+    int skip_checksum_validation;   /* Disable checksum validation for RDB and RESTORE payload. */     //ldc:跳过rdb和restore的checksum
+    int jemalloc_bg_thread;         /* Enable jemalloc background thread */     //ldc:允许后台线程使用jemalloc
     size_t active_defrag_ignore_bytes; /* minimum amount of fragmentation waste to start active defrag */
     int active_defrag_threshold_lower; /* minimum percentage of fragmentation to start active defrag */
     int active_defrag_threshold_upper; /* maximum percentage of fragmentation at which we use maximum effort */
     int active_defrag_cycle_min;       /* minimal effort for defrag in CPU percentage */
     int active_defrag_cycle_max;       /* maximal effort for defrag in CPU percentage */
     unsigned long active_defrag_max_scan_fields; /* maximum number of fields of set/hash/zset/list to process from within the main dict scan */
-    size_t client_max_querybuf_len; /* Limit for client query buffer length */
-    int dbnum;                      /* Total number of configured DBs */
-    int supervised;                 /* 1 if supervised, 0 otherwise. */
-    int supervised_mode;            /* See SUPERVISED_* */
-    int daemonize;                  /* True if running as a daemon */
+    size_t client_max_querybuf_len; /* Limit for client query buffer length */      //ldc:client query buffer最大长度
+    int dbnum;                      /* Total number of configured DBs */        //ldc:db个数
+    int supervised;                 /* 1 if supervised, 0 otherwise. */     //ldc:是否开启supervised
+    int supervised_mode;            /* See SUPERVISED_* */      //ldc:SUPERVISED_UPSTART、SUPERVISED_SYSTEMD、SUPERVISED_AUTODETECT、SUPERVISED_NONE
+    int daemonize;                  /* True if running as a daemon */       //ldc:是否开启守护模式
     int set_proc_title;             /* True if change proc title */
     char *proc_title_template;      /* Process title template format */
     clientBufferLimitsConfig client_obuf_limits[CLIENT_TYPE_OBUF_COUNT];
-    int pause_cron;                 /* Don't run cron tasks (debug) */
-    int latency_tracking_enabled;   /* 1 if extended latency tracking is enabled, 0 otherwise. */
+    int pause_cron;                 /* Don't run cron tasks (debug) */      //ldc:是否停止定时任务
+    int latency_tracking_enabled;   /* 1 if extended latency tracking is enabled, 0 otherwise. */       //ldc:是否开启延迟track
     double *latency_tracking_info_percentiles; /* Extended latency tracking info output percentile list configuration. */
     int latency_tracking_info_percentiles_len;
     /* AOF persistence */
@@ -1731,19 +1731,19 @@ struct redisServer {
     redisOpArray also_propagate;    /* Additional command to propagate. */
     int replication_allowed;        /* Are we allowed to replicate? */
     /* Logging */
-    char *logfile;                  /* Path of log file */
-    int syslog_enabled;             /* Is syslog enabled? */
-    char *syslog_ident;             /* Syslog ident */
-    int syslog_facility;            /* Syslog facility */
-    int crashlog_enabled;           /* Enable signal handler for crashlog.
+    char *logfile;                  /* Path of log file */      //ldc:日志路径
+    int syslog_enabled;             /* Is syslog enabled? */        //ldc:syslog是否开启
+    char *syslog_ident;             /* Syslog ident */      //ldc:syslog名字
+    int syslog_facility;            /* Syslog facility */      //ldc:syslog设备
+    int crashlog_enabled;           /* Enable signal handler for crashlog.      //ldc:是否开启crashlog
                                      * disable for clean core dumps. */
-    int memcheck_enabled;           /* Enable memory check on crash. */
+    int memcheck_enabled;           /* Enable memory check on crash. */      //ldc:crash时是否检查内存
     int use_exit_on_panic;          /* Use exit() on panic and assert rather than
                                      * abort(). useful for Valgrind. */
     /* Shutdown */
-    int shutdown_timeout;           /* Graceful shutdown time limit in seconds. */
-    int shutdown_on_sigint;         /* Shutdown flags configured for SIGINT. */
-    int shutdown_on_sigterm;        /* Shutdown flags configured for SIGTERM. */
+    int shutdown_timeout;           /* Graceful shutdown time limit in seconds. */      //ldc:shutdown的超时时间限制
+    int shutdown_on_sigint;         /* Shutdown flags configured for SIGINT. */      //ldc:SIGINT信号shutdown
+    int shutdown_on_sigterm;        /* Shutdown flags configured for SIGTERM. */      //ldc:SIGTERM信号shutdown
 
     /* Replication (master) */
     char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */
@@ -1810,26 +1810,26 @@ struct redisServer {
     list *clients_waiting_acks;         /* Clients waiting in WAIT command. */
     int get_ack_from_slaves;            /* If true we send REPLCONF GETACK. */
     /* Limits */
-    unsigned int maxclients;            /* Max number of simultaneous clients */
-    unsigned long long maxmemory;   /* Max number of memory bytes to use */
-    ssize_t maxmemory_clients;       /* Memory limit for total client buffers */
-    int maxmemory_policy;           /* Policy for key eviction */
+    unsigned int maxclients;            /* Max number of simultaneous clients */      //ldc:最大连接数
+    unsigned long long maxmemory;   /* Max number of memory bytes to use */      //ldc:最大内存容量
+    ssize_t maxmemory_clients;       /* Memory limit for total client buffers */      //ldc:所有client buffer的容量
+    int maxmemory_policy;           /* Policy for key eviction */      //ldc:key淘汰机制
     int maxmemory_samples;          /* Precision of random sampling */
     int maxmemory_eviction_tenacity;/* Aggressiveness of eviction processing */
     int lfu_log_factor;             /* LFU logarithmic counter factor. */
     int lfu_decay_time;             /* LFU counter decay factor. */
-    long long proto_max_bulk_len;   /* Protocol bulk length maximum size. */
-    int oom_score_adj_values[CONFIG_OOM_COUNT];   /* Linux oom_score_adj configuration */
-    int oom_score_adj;                            /* If true, oom_score_adj is managed */
-    int disable_thp;                              /* If true, disable THP by syscall */
+    long long proto_max_bulk_len;   /* Protocol bulk length maximum size. */      //ldc:批量协议长度
+    int oom_score_adj_values[CONFIG_OOM_COUNT];   /* Linux oom_score_adj configuration */      //ldc:OOM score设置
+    int oom_score_adj;                            /* If true, oom_score_adj is managed */      //ldc:OOM score是否开启
+    int disable_thp;                              /* If true, disable THP by syscall */      //ldc:是否关闭透明大页
     /* Blocked clients */
-    unsigned int blocked_clients;   /* # of clients executing a blocking cmd.*/
-    unsigned int blocked_clients_by_type[BLOCKED_NUM];
-    list *unblocked_clients; /* list of clients to unblock before next loop */
+    unsigned int blocked_clients;   /* # of clients executing a blocking cmd.*/      //ldc:执行阻塞命令的clients个数
+    unsigned int blocked_clients_by_type[BLOCKED_NUM];      //ldc:各种阻塞类型的clients个数
+    list *unblocked_clients; /* list of clients to unblock before next loop */      //ldc:下次循环时需要解除阻塞的clients列表
     list *ready_keys;        /* List of readyList structures for BLPOP & co */
     /* Client side caching. */
-    unsigned int tracking_clients;  /* # of clients with tracking enabled.*/
-    size_t tracking_table_max_keys; /* Max number of keys in tracking table. */
+    unsigned int tracking_clients;  /* # of clients with tracking enabled.*/      //ldc:开启客户端缓存的clients个数
+    size_t tracking_table_max_keys; /* Max number of keys in tracking table. */      //ldc:客户端缓存的最大keys个数
     list *tracking_pending_keys; /* tracking invalidation keys pending to flush */
     /* Sort parameters - qsort_r() is only available under BSD so we
      * have to take this state global, in order to pass it to sortCompare() */
@@ -1856,7 +1856,7 @@ struct redisServer {
     mstime_t mstime;            /* 'unixtime' in milliseconds. */
     ustime_t ustime;            /* 'unixtime' in microseconds. */
     size_t blocking_op_nesting; /* Nesting level of blocking operation, used to reset blocked_last_cron. */
-    long long blocked_last_cron; /* Indicate the mstime of the last time we did cron jobs from a blocking operation */
+    long long blocked_last_cron; /* Indicate the mstime of the last time we did cron jobs from a blocking operation */      //ldc:定时任务过程中,上一次阻塞时间
     /* Pubsub */
     dict *pubsub_channels;  /* Map channels to list of subscribed clients */
     dict *pubsub_patterns;  /* A dict of pubsub_patterns */
@@ -1864,29 +1864,29 @@ struct redisServer {
                                    xor of NOTIFY_... flags. */
     dict *pubsubshard_channels;  /* Map shard channels to list of subscribed clients */
     /* Cluster */
-    int cluster_enabled;      /* Is cluster enabled? */
-    int cluster_port;         /* Set the cluster port for a node. */
-    mstime_t cluster_node_timeout; /* Cluster node timeout. */
-    char *cluster_configfile; /* Cluster auto-generated config file name. */
-    struct clusterState *cluster;  /* State of the cluster */
-    int cluster_migration_barrier; /* Cluster replicas migration barrier. */
+    int cluster_enabled;      /* Is cluster enabled? */      //ldc:是否开启cluster
+    int cluster_port;         /* Set the cluster port for a node. */      //ldc:cluster的端口
+    mstime_t cluster_node_timeout; /* Cluster node timeout. */      //ldc:cluster节点的超时时间
+    char *cluster_configfile; /* Cluster auto-generated config file name. */      //ldc:cluster的配置文件名
+    struct clusterState *cluster;  /* State of the cluster */      //ldc:cluster状态
+    int cluster_migration_barrier; /* Cluster replicas migration barrier. */      //ldc:那些分配后仍然剩余migration barrier个从节点的主节点才会触发节点分配
     int cluster_allow_replica_migration; /* Automatic replica migrations to orphaned masters and from empty masters */
-    int cluster_slave_validity_factor; /* Slave max data age for failover. */
-    int cluster_require_full_coverage; /* If true, put the cluster down if
+    int cluster_slave_validity_factor; /* Slave max data age for failover. */      //ldc:如果data_age > master到slave的ping间隔时间+超时时间*cluster_slave_validity_factor, 则认为过期
+    int cluster_require_full_coverage; /* If true, put the cluster down if      //ldc:cluster是否要求配置覆盖所有slots
                                           there is at least an uncovered slot.*/
-    int cluster_slave_no_failover;  /* Prevent slave from starting a failover
+    int cluster_slave_no_failover;  /* Prevent slave from starting a failover      //ldc:如果master挂了，是否允许slave failover
                                        if the master is in failure state. */
-    char *cluster_announce_ip;  /* IP address to announce on cluster bus. */
-    char *cluster_announce_hostname;  /* hostname to announce on cluster bus. */
-    int cluster_preferred_endpoint_type; /* Use the announced hostname when available. */
-    int cluster_announce_port;     /* base port to announce on cluster bus. */
+    char *cluster_announce_ip;  /* IP address to announce on cluster bus. */      //ldc:cluster的ip地址
+    char *cluster_announce_hostname;  /* hostname to announce on cluster bus. */      //ldc:cluster的hostname
+    int cluster_preferred_endpoint_type; /* Use the announced hostname when available. */      //ldc:cluster是否使用hostname
+    int cluster_announce_port;     /* base port to announce on cluster bus. */      //ldc:cluster的端口
     int cluster_announce_tls_port; /* TLS port to announce on cluster bus. */
-    int cluster_announce_bus_port; /* bus port to announce on cluster bus. */
-    int cluster_module_flags;      /* Set of flags that Redis modules are able
+    int cluster_announce_bus_port; /* bus port to announce on cluster bus. */      //ldc:cluster的bus端口
+    int cluster_module_flags;      /* Set of flags that Redis modules are able      //ldc:REDISMODULE_CLUSTER_FLAG_NONE、REDISMODULE_CLUSTER_FLAG_NO_FAILOVER、REDISMODULE_CLUSTER_FLAG_NO_REDIRECTION
                                       to set in order to suppress certain
                                       native Redis Cluster features. Check the
                                       REDISMODULE_CLUSTER_FLAG_*. */
-    int cluster_allow_reads_when_down; /* Are reads allowed when the cluster
+    int cluster_allow_reads_when_down; /* Are reads allowed when the cluster      //ldc:cluster挂掉后是否允许读
                                         is down? */
     int cluster_config_file_lock_fd;   /* cluster config fd, will be flock */
     unsigned long long cluster_link_sendbuf_limit_bytes;  /* Memory usage limit on individual link send buffers*/
@@ -1916,7 +1916,7 @@ struct redisServer {
     /* Assert & bug reporting */
     int watchdog_period;  /* Software watchdog period in ms. 0 = off */
     /* System hardware info */
-    size_t system_memory_size;  /* Total memory in system as reported by OS */
+    size_t system_memory_size;  /* Total memory in system as reported by OS */      //ldc:OS的内存大小
     /* TLS Configuration */
     int tls_cluster;
     int tls_replication;

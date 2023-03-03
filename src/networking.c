@@ -43,7 +43,7 @@ int ProcessingEventsWhileBlocked = 0; /* See processEventsWhileBlocked(). */
 /* Return the size consumed from the allocator, for the specified SDS string,
  * including internal fragmentation. This function is used in order to compute
  * the client output buffer size. */
-size_t sdsZmallocSize(sds s) {
+size_t sdsZmallocSize(sds s) {      //ldc:
     void *sh = sdsAllocPtr(s);
     return zmalloc_size(sh);
 }
@@ -4437,7 +4437,7 @@ size_t getClientEvictionLimit(void) {
     return maxmemory_clients_actual;
 }
 
-void evictClients(void) {
+void evictClients(void) {       //ldc:淘汰客户端
     if (!server.client_mem_usage_buckets)
         return;
     /* Start eviction from topmost bucket (largest clients) */

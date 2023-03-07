@@ -1598,9 +1598,9 @@ struct redisServer {
     size_t stat_current_cow_peak;   /* Peak size of copy on write bytes. */      //ldc:write bytes时copy峰值
     size_t stat_current_cow_bytes;  /* Copy on write bytes while child is active. */      //ldc:当子进程活跃过程中，write bytes时的copy字节数
     monotime stat_current_cow_updated;  /* Last update time of stat_current_cow_bytes */        //ldc:上次更新stat_current_cow_bytes的时间
-    size_t stat_current_save_keys_processed;  /* Processed keys while child is active. *//      //ldc:当子进程活跃过程中，处理的kyes个数
-    size_t stat_current_save_keys_total;  /* Number of keys when child started. *//      //ldc:当子进程启动时keys个数
-    size_t stat_rdb_cow_bytes;      /* Copy on write bytes during RDB saving. *//      //ldc:RDB saving过程中，write bytes时copy的字节数
+    size_t stat_current_save_keys_processed;  /* Processed keys while child is active. */      //ldc:当子进程活跃过程中，处理的kyes个数
+    size_t stat_current_save_keys_total;  /* Number of keys when child started. */      //ldc:当子进程启动时keys个数
+    size_t stat_rdb_cow_bytes;      /* Copy on write bytes during RDB saving. */      //ldc:RDB saving过程中，write bytes时copy的字节数
     size_t stat_aof_cow_bytes;      /* Copy on write bytes during AOF rewrite. */      //ldc:AOF rewrite过程中，write bytes时copy的字节数
     size_t stat_module_cow_bytes;   /* Copy on write bytes during module fork. */      //ldc:module fork过程中，write bytes时copy的字节数
     double stat_module_progress;   /* Module save progress. */

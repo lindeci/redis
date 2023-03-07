@@ -33,14 +33,14 @@ struct clusterNode;
 
 /* clusterLink encapsulates everything needed to talk with a remote node. */
 typedef struct clusterLink {
-    mstime_t ctime;             /* Link creation time */
-    connection *conn;           /* Connection to remote node */
-    sds sndbuf;                 /* Packet send buffer */
-    char *rcvbuf;               /* Packet reception buffer */
-    size_t rcvbuf_len;          /* Used size of rcvbuf */
-    size_t rcvbuf_alloc;        /* Allocated size of rcvbuf */
-    struct clusterNode *node;   /* Node related to this link. Initialized to NULL when unknown */
-    int inbound;                /* 1 if this link is an inbound link accepted from the related node */
+    mstime_t ctime;             /* Link creation time */        //ldc:连接的创建时间
+    connection *conn;           /* Connection to remote node */     //ldc:
+    sds sndbuf;                 /* Packet send buffer */        //ldc:输出缓冲区，保存着等待发送给其他节点的消息（message ）
+    char *rcvbuf;               /* Packet reception buffer */       //ldc:输入缓冲区，保存着从其他节点接收到的消息
+    size_t rcvbuf_len;          /* Used size of rcvbuf */       //ldc:rcvbuf的使用长度
+    size_t rcvbuf_alloc;        /* Allocated size of rcvbuf */      //ldc:rcvbuf的分配内存长度
+    struct clusterNode *node;   /* Node related to this link. Initialized to NULL when unknown */       //ldc:与这个连接相关联的节点，如果没有的话就为NULL
+    int inbound;                /* 1 if this link is an inbound link accepted from the related node */      //ldc:如果是1,则它是inbound link
 } clusterLink;
 
 /* Cluster node flags and macros. */
@@ -85,19 +85,19 @@ typedef struct clusterLink {
  * Note that the PING, PONG and MEET messages are actually the same exact
  * kind of packet. PONG is the reply to ping, in the exact format as a PING,
  * while MEET is a special PING that forces the receiver to add the sender
- * as a node (if it is not already in the list). */
+ * as a node (if it is not already in the list). */     //ldc:消息类型
 #define CLUSTERMSG_TYPE_PING 0          /* Ping */
 #define CLUSTERMSG_TYPE_PONG 1          /* Pong (reply to Ping) */
-#define CLUSTERMSG_TYPE_MEET 2          /* Meet "let's join" message */
-#define CLUSTERMSG_TYPE_FAIL 3          /* Mark node xxx as failing */
-#define CLUSTERMSG_TYPE_PUBLISH 4       /* Pub/Sub Publish propagation */
-#define CLUSTERMSG_TYPE_FAILOVER_AUTH_REQUEST 5 /* May I failover? */
-#define CLUSTERMSG_TYPE_FAILOVER_AUTH_ACK 6     /* Yes, you have my vote */
-#define CLUSTERMSG_TYPE_UPDATE 7        /* Another node slots configuration */
-#define CLUSTERMSG_TYPE_MFSTART 8       /* Pause clients for manual failover */
-#define CLUSTERMSG_TYPE_MODULE 9        /* Module cluster API message. */
-#define CLUSTERMSG_TYPE_PUBLISHSHARD 10 /* Pub/Sub Publish shard propagation */
-#define CLUSTERMSG_TYPE_COUNT 11        /* Total number of message types. */
+#define CLUSTERMSG_TYPE_MEET 2          /* Meet "let's join" message */     //ldc:加入集群的消息
+#define CLUSTERMSG_TYPE_FAIL 3          /* Mark node xxx as failing */      //ldc:标记成故障
+#define CLUSTERMSG_TYPE_PUBLISH 4       /* Pub/Sub Publish propagation */       //ldc:发布订阅时发布消息推送
+#define CLUSTERMSG_TYPE_FAILOVER_AUTH_REQUEST 5 /* May I failover? */       //ldc:可以故障转移？
+#define CLUSTERMSG_TYPE_FAILOVER_AUTH_ACK 6     /* Yes, you have my vote */     //ldc:允许故障转移
+#define CLUSTERMSG_TYPE_UPDATE 7        /* Another node slots configuration */      //ldc:其他节点的slots有更新
+#define CLUSTERMSG_TYPE_MFSTART 8       /* Pause clients for manual failover */     //ldc:手动暂停这个节点, 进行手动故障转移
+#define CLUSTERMSG_TYPE_MODULE 9        /* Module cluster API message. */       //ldc:集群模块 API 消息
+#define CLUSTERMSG_TYPE_PUBLISHSHARD 10 /* Pub/Sub Publish shard propagation */     //ldc:发布订阅分片广播
+#define CLUSTERMSG_TYPE_COUNT 11        /* Total number of message types. */        //ldc:消息类型的总数
 
 /* Flags that a module can set in order to prevent certain Redis Cluster
  * features to be enabled. Useful when implementing a different distributed
@@ -108,55 +108,55 @@ typedef struct clusterLink {
 
 /* This structure represent elements of node->fail_reports. */
 typedef struct clusterNodeFailReport {
-    struct clusterNode *node;  /* Node reporting the failure condition. */
-    mstime_t time;             /* Time of the last report from this node. */
+    struct clusterNode *node;  /* Node reporting the failure condition. */      //ldc:上报整个clusterNode
+    mstime_t time;             /* Time of the last report from this node. */        //ldc:这个节点的上次报告异常的时间
 } clusterNodeFailReport;
 
 typedef struct clusterNode {
-    mstime_t ctime; /* Node object creation time. */
-    char name[CLUSTER_NAMELEN]; /* Node name, hex string, sha1-size */
-    int flags;      /* CLUSTER_NODE_... */
-    uint64_t configEpoch; /* Last configEpoch observed for this node */
-    unsigned char slots[CLUSTER_SLOTS/8]; /* slots handled by this node */
-    uint16_t *slot_info_pairs; /* Slots info represented as (start/end) pair (consecutive index). */
-    int slot_info_pairs_count; /* Used number of slots in slot_info_pairs */
-    int numslots;   /* Number of slots handled by this node */
-    int numslaves;  /* Number of slave nodes, if this is a master */
-    struct clusterNode **slaves; /* pointers to slave nodes */
-    struct clusterNode *slaveof; /* pointer to the master node. Note that it
+    mstime_t ctime; /* Node object creation time. */        //ldc:节点创建时间
+    char name[CLUSTER_NAMELEN]; /* Node name, hex string, sha1-size */        //ldc:节点名字
+    int flags;      /* CLUSTER_NODE_... */      //ldc:节点标识，标记节点角色或者状态，比如主节点从节点或者在线和下线 CLUSTER_NODE_MASTER CLUSTER_NODE_SLAVE CLUSTER_NODE_PFAIL CLUSTER_NODE_FAIL CLUSTER_NODE_MYSELF CLUSTER_NODE_HANDSHAKE CLUSTER_NODE_NOADDR CLUSTER_NODE_MEET CLUSTER_NODE_MIGRATE_TO CLUSTER_NODE_NOFAILOVER CLUSTER_NODE_NULL_NAME
+    uint64_t configEpoch; /* Last configEpoch observed for this node */     //ldc:节点当前的配置纪元，这是一个集群节点配置相关的概念，每个集群节点都有自己独一无二的 configepoch
+    unsigned char slots[CLUSTER_SLOTS/8]; /* slots handled by this node */     //ldc:lots位图，由当前clusterNode负责的slot为1
+    uint16_t *slot_info_pairs; /* Slots info represented as (start/end) pair (consecutive index). */     //ldc:例如slot为33-99
+    int slot_info_pairs_count; /* Used number of slots in slot_info_pairs */     //ldc:slot_info_pairs个数
+    int numslots;   /* Number of slots handled by this node */     //ldc:负责多少槽
+    int numslaves;  /* Number of slave nodes, if this is a master */     //ldc:有多少从节点
+    struct clusterNode **slaves; /* pointers to slave nodes */     //ldc:指向所有的从节点
+    struct clusterNode *slaveof; /* pointer to the master node. Note that it     //ldc:指向主节点（如果该节点为从节点的话）
                                     may be NULL even if the node is a slave
                                     if we don't have the master node in our
                                     tables. */
-    unsigned long long last_in_ping_gossip; /* The number of the last carried in the ping gossip section */
-    mstime_t ping_sent;      /* Unix time we sent latest ping */
-    mstime_t pong_received;  /* Unix time we received the pong */
-    mstime_t data_received;  /* Unix time we received any data */
-    mstime_t fail_time;      /* Unix time when FAIL flag was set */
-    mstime_t voted_time;     /* Last time we voted for a slave of this master */
-    mstime_t repl_offset_time;  /* Unix time we received offset for this node */
-    mstime_t orphaned_time;     /* Starting time of orphaned master condition */
-    long long repl_offset;      /* Last known repl offset for this node. */
-    char ip[NET_IP_STR_LEN];    /* Latest known IP address of this node */
-    sds hostname;               /* The known hostname for this node */
-    int port;                   /* Latest known clients port (TLS or plain). */
-    int pport;                  /* Latest known clients plaintext port. Only used
+    unsigned long long last_in_ping_gossip; /* The number of the last carried in the ping gossip section */     //ldc:上一次ping gossip section收到的个数
+    mstime_t ping_sent;      /* Unix time we sent latest ping */     //ldc:当前节点最后一次向该节点发送 PING 消息的时间
+    mstime_t pong_received;  /* Unix time we received the pong */     //ldc:当前节点最后一次收到该节点 PONG 消息的时间
+    mstime_t data_received;  /* Unix time we received any data */     //ldc:上次收到任何数据的时间
+    mstime_t fail_time;      /* Unix time when FAIL flag was set */     //ldc:FAIL 标志位被设置的时间
+    mstime_t voted_time;     /* Last time we voted for a slave of this master */     //ldc:上次为这master选slave的时间
+    mstime_t repl_offset_time;  /* Unix time we received offset for this node */     //ldc:上次收到这个节点offset的时间
+    mstime_t orphaned_time;     /* Starting time of orphaned master condition */     //ldc:master成为孤儿的开始时间
+    long long repl_offset;      /* Last known repl offset for this node. */     //ldc:这个节点的上次repl offset
+    char ip[NET_IP_STR_LEN];    /* Latest known IP address of this node */     //ldc:节点的IP 地址
+    sds hostname;               /* The known hostname for this node */     //ldc:hostname
+    int port;                   /* Latest known clients port (TLS or plain). */     //ldc:可能是tls端口
+    int pport;                  /* Latest known clients plaintext port. Only used     //ldc:可能是tls端口
                                    if the main clients port is for TLS. */
-    int cport;                  /* Latest known cluster port of this node. */
-    clusterLink *link;          /* TCP/IP link established toward this node */
-    clusterLink *inbound_link;  /* TCP/IP link accepted from this node */
-    list *fail_reports;         /* List of nodes signaling this as failing */
+    int cport;                  /* Latest known cluster port of this node. */     //ldc:端口
+    clusterLink *link;          /* TCP/IP link established toward this node */     //ldc:TCP/IP link
+    clusterLink *inbound_link;  /* TCP/IP link accepted from this node */     //ldc:TCP/IP link
+    list *fail_reports;         /* List of nodes signaling this as failing */     //ldc:下线记录列表
 } clusterNode;
 
 /* Slot to keys for a single slot. The keys in the same slot are linked together
  * using dictEntry metadata. */
-typedef struct slotToKeys {
-    uint64_t count;             /* Number of keys in the slot. */
-    dictEntry *head;            /* The first key-value entry in the slot. */
+typedef struct slotToKeys {     //ldc:单个slot的keys
+    uint64_t count;             /* Number of keys in the slot. */       //ldc:该slot中keys个数
+    dictEntry *head;            /* The first key-value entry in the slot. */        //ldc:dictEntry头指针
 } slotToKeys;
 
 /* Slot to keys mapping for all slots, opaque outside this file. */
 struct clusterSlotToKeyMapping {
-    slotToKeys by_slot[CLUSTER_SLOTS];
+    slotToKeys by_slot[CLUSTER_SLOTS];      //ldc:CLUSTER_SLOTS=16384个slotToKeys
 };
 
 /* Dict entry metadata for cluster mode, used for the Slot to Key API to form a
@@ -168,44 +168,44 @@ typedef struct clusterDictEntryMetadata {
 
 
 typedef struct clusterState {
-    clusterNode *myself;  /* This node */
-    uint64_t currentEpoch;
-    int state;            /* CLUSTER_OK, CLUSTER_FAIL, ... */
-    int size;             /* Num of master nodes with at least one slot */
-    dict *nodes;          /* Hash table of name -> clusterNode structures */
+    clusterNode *myself;  /* This node */       //ldc:指向当前节点的指针
+    uint64_t currentEpoch;      //ldc:集群当前的配置纪元，用于实现故障转移
+    int state;            /* CLUSTER_OK, CLUSTER_FAIL, ... */       //ldc:集群当前的状态：是在线还是下线
+    int size;             /* Num of master nodes with at least one slot */      //ldc:集群中至少有一个槽的节点的数量
+    dict *nodes;          /* Hash table of name -> clusterNode structures */        //ldc:集群节点名单（包括myself 节点）,字典的键为节点的名字，字典的值为节点对应的clusterNode 结构
     dict *nodes_black_list; /* Nodes we don't re-add for a few seconds. */
-    clusterNode *migrating_slots_to[CLUSTER_SLOTS];
-    clusterNode *importing_slots_from[CLUSTER_SLOTS];
-    clusterNode *slots[CLUSTER_SLOTS];
+    clusterNode *migrating_slots_to[CLUSTER_SLOTS];     //ldc:迁移slots到哪些clusterNode
+    clusterNode *importing_slots_from[CLUSTER_SLOTS];     //ldc:从哪些clusterNode导入slots过来
+    clusterNode *slots[CLUSTER_SLOTS];      //ldc:每个slot对应的clusterNode
     rax *slots_to_channels;
-    /* The following fields are used to take the slave state on elections. */
-    mstime_t failover_auth_time; /* Time of previous or next election. */
-    int failover_auth_count;    /* Number of votes received so far. */
-    int failover_auth_sent;     /* True if we already asked for votes. */
-    int failover_auth_rank;     /* This slave rank for current auth request. */
-    uint64_t failover_auth_epoch; /* Epoch of the current election. */
-    int cant_failover_reason;   /* Why a slave is currently not able to
+    /* The following fields are used to take the slave state on elections. */       //ldc:slave投票的属性成员
+    mstime_t failover_auth_time; /* Time of previous or next election. */       //ldc:发起选举的时间
+    int failover_auth_count;    /* Number of votes received so far. */      //ldc:目前为止收到投票的数量
+    int failover_auth_sent;     /* True if we already asked for votes. */       //ldc:是否发起了投票，如果已经发起，值大于0
+    int failover_auth_rank;     /* This slave rank for current auth request. */     //ldc:从节点排名
+    uint64_t failover_auth_epoch; /* Epoch of the current election. */      //ldc:前选举的纪元
+    int cant_failover_reason;   /* Why a slave is currently not able to     //ldc:从节点不能执行故障转移的原因  CLUSTER_CANT_FAILOVER_NONE、CLUSTER_CANT_FAILOVER_DATA_AGE、CLUSTER_CANT_FAILOVER_WAITING_DELAY、CLUSTER_CANT_FAILOVER_EXPIRED、CLUSTER_CANT_FAILOVER_WAITING_VOTES、CLUSTER_CANT_FAILOVER_RELOG_PERIOD
                                    failover. See the CANT_FAILOVER_* macros. */
     /* Manual failover state in common. */
-    mstime_t mf_end;            /* Manual failover time limit (ms unixtime).
+    mstime_t mf_end;            /* Manual failover time limit (ms unixtime).        //ldc:手工切故障的到期时间
                                    It is zero if there is no MF in progress. */
     /* Manual failover state of master. */
-    clusterNode *mf_slave;      /* Slave performing the manual failover. */
+    clusterNode *mf_slave;      /* Slave performing the manual failover. */     //ldc:手工切换故障时slave的表现
     /* Manual failover state of slave. */
-    long long mf_master_offset; /* Master offset the slave needs to start MF
+    long long mf_master_offset; /* Master offset the slave needs to start MF        //ldc:手工切换时,slave对应的master的offset
                                    or -1 if still not received. */
-    int mf_can_start;           /* If non-zero signal that the manual failover
+    int mf_can_start;           /* If non-zero signal that the manual failover      //ldc:如果是0，则请求masters投票的手工切换可以开始
                                    can start requesting masters vote. */
     /* The following fields are used by masters to take state on elections. */
-    uint64_t lastVoteEpoch;     /* Epoch of the last vote granted. */
-    int todo_before_sleep; /* Things to do in clusterBeforeSleep(). */
+    uint64_t lastVoteEpoch;     /* Epoch of the last vote granted. */       //ldc:上次投票被接受的epoch
+    int todo_before_sleep; /* Things to do in clusterBeforeSleep(). */      //ldc:clusterBeforeSleep()中需要处理的事情
     /* Stats */
     /* Messages received and sent by type. */
-    long long stats_bus_messages_sent[CLUSTERMSG_TYPE_COUNT];
-    long long stats_bus_messages_received[CLUSTERMSG_TYPE_COUNT];
-    long long stats_pfail_nodes;    /* Number of nodes in PFAIL status,
+    long long stats_bus_messages_sent[CLUSTERMSG_TYPE_COUNT];       //ldc:各种发送CLUSTERMSG的统计
+    long long stats_bus_messages_received[CLUSTERMSG_TYPE_COUNT];       //ldc:各种接收CLUSTERMSG的统计
+    long long stats_pfail_nodes;    /* Number of nodes in PFAIL status,     //ldc:PFAIL状态的节点个数
                                        excluding nodes without address. */
-    unsigned long long stat_cluster_links_buffer_limit_exceeded;  /* Total number of cluster links freed due to exceeding buffer limit */
+    unsigned long long stat_cluster_links_buffer_limit_exceeded;  /* Total number of cluster links freed due to exceeding buffer limit */       //ldc:因为超出buffer的限制导致cluster被free的次数
 } clusterState;
 
 /* Redis cluster messages header */
@@ -214,19 +214,19 @@ typedef struct clusterState {
  * to the first node, using the getsockname() function. Then we'll use this
  * address for all the next messages. */
 typedef struct {
-    char nodename[CLUSTER_NAMELEN];
-    uint32_t ping_sent;
-    uint32_t pong_received;
+    char nodename[CLUSTER_NAMELEN];     //ldc:节点的 nodeId
+    uint32_t ping_sent;     //ldc:最后一次向该节点发送 ping 消息时间
+    uint32_t pong_received;     //ldc:最后一次接收该节点 pong 消息时间
     char ip[NET_IP_STR_LEN];  /* IP address last time it was seen */
     uint16_t port;              /* base port last time it was seen */
     uint16_t cport;             /* cluster port last time it was seen */
-    uint16_t flags;             /* node->flags copy */
+    uint16_t flags;             /* node->flags copy */      //ldc:节点标识
     uint16_t pport;             /* plaintext-port, when base port is TLS */
     uint16_t notused1;
 } clusterMsgDataGossip;
 
 typedef struct {
-    char nodename[CLUSTER_NAMELEN];
+    char nodename[CLUSTER_NAMELEN];       //ldc:节点的 nodeId
 } clusterMsgDataFail;
 
 typedef struct {
@@ -306,30 +306,30 @@ union clusterMsgData {
 #define CLUSTER_PROTO_VER 1 /* Cluster bus protocol version. */
 
 typedef struct {
-    char sig[4];        /* Signature "RCmb" (Redis Cluster message bus). */
-    uint32_t totlen;    /* Total length of this message */
-    uint16_t ver;       /* Protocol version, currently set to 1. */
+    char sig[4];        /* Signature "RCmb" (Redis Cluster message bus). */     //ldc:信号标示
+    uint32_t totlen;    /* Total length of this message */      //ldc:消息总长度
+    uint16_t ver;       /* Protocol version, currently set to 1. */     //ldc:协议版本
     uint16_t port;      /* TCP base port number. */
-    uint16_t type;      /* Message type */
-    uint16_t count;     /* Only used for some kind of messages. */
-    uint64_t currentEpoch;  /* The epoch accordingly to the sending node. */
-    uint64_t configEpoch;   /* The config epoch if it's a master, or the last
+    uint16_t type;      /* Message type */      //ldc:消息类型 , 用于区分 meet,ping,pong 等消息
+    uint16_t count;     /* Only used for some kind of messages. */      //ldc:消息体包含的节点数量，仅用于 meet,ping,ping 消息类型
+    uint64_t currentEpoch;  /* The epoch accordingly to the sending node. */        //ldc:当前发送节点的配置纪元
+    uint64_t configEpoch;   /* The config epoch if it's a master, or the last       //ldc:主节点的纪元，或者 从节点从主节点获取的纪元
                                epoch advertised by its master if it is a
                                slave. */
-    uint64_t offset;    /* Master replication offset if node is a master or
+    uint64_t offset;    /* Master replication offset if node is a master or     //ldc:复制偏移量
                            processed replication offset if node is a slave. */
-    char sender[CLUSTER_NAMELEN]; /* Name of the sender node */
-    unsigned char myslots[CLUSTER_SLOTS/8];
-    char slaveof[CLUSTER_NAMELEN];
+    char sender[CLUSTER_NAMELEN]; /* Name of the sender node */     //ldc:发送节点的 nodeId
+    unsigned char myslots[CLUSTER_SLOTS/8];     //ldc:发送节点负责的槽信息
+    char slaveof[CLUSTER_NAMELEN];      //ldc:如果发送节点是从节点，记录对应主节点的 nodeId
     char myip[NET_IP_STR_LEN];    /* Sender IP, if not all zeroed. */
     uint16_t extensions; /* Number of extensions sent along with this packet. */
     char notused1[30];   /* 30 bytes reserved for future usage. */
     uint16_t pport;      /* Sender TCP plaintext port, if base port is TLS */
     uint16_t cport;      /* Sender TCP cluster bus port */
-    uint16_t flags;      /* Sender node flags */
-    unsigned char state; /* Cluster state from the POV of the sender */
-    unsigned char mflags[3]; /* Message flags: CLUSTERMSG_FLAG[012]_... */
-    union clusterMsgData data;
+    uint16_t flags;      /* Sender node flags */        //ldc:发送节点标识 , 区分主从角色，是否下线等
+    unsigned char state; /* Cluster state from the POV of the sender */     //ldc:发送节点所处的集群状态
+    unsigned char mflags[3]; /* Message flags: CLUSTERMSG_FLAG[012]_... */      //ldc:消息标识
+    union clusterMsgData data;      //ldc:消息正文
 } clusterMsg;
 
 /* clusterMsg defines the gossip wire protocol exchanged among Redis cluster
@@ -341,7 +341,7 @@ typedef struct {
  * changes in clusterMsg be caught at compile time.
  */
 
-static_assert(offsetof(clusterMsg, sig) == 0, "unexpected field offset");
+static_assert(offsetof(clusterMsg, sig) == 0, "unexpected field offset");       //ldc:static_assert可让编译器在编译时进行断言检查
 static_assert(offsetof(clusterMsg, totlen) == 4, "unexpected field offset");
 static_assert(offsetof(clusterMsg, ver) == 8, "unexpected field offset");
 static_assert(offsetof(clusterMsg, port) == 10, "unexpected field offset");

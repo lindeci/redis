@@ -2675,7 +2675,7 @@ void clusterLinkConnectHandler(connection *conn) {      //ldc:建立连接的监
      * table. */
     mstime_t old_ping_sent = node->ping_sent;
     clusterSendPing(link, node->flags & CLUSTER_NODE_MEET ?
-            CLUSTERMSG_TYPE_MEET : CLUSTERMSG_TYPE_PING);
+            CLUSTERMSG_TYPE_MEET : CLUSTERMSG_TYPE_PING);       //ldc:连接成功后，发送CLUSTER_NODE_MEET消息
     if (old_ping_sent) {
         /* If there was an active ping before the link was
          * disconnected, we want to restore the ping time, otherwise
@@ -3910,22 +3910,22 @@ void clusterHandleManualFailover(void) {
 /* Check if the node is disconnected and re-establish the connection.
  * Also update a few stats while we are here, that can be used to make
  * better decisions in other part of the code. */
-static int clusterNodeCronHandleReconnect(clusterNode *node, mstime_t handshake_timeout, mstime_t now) {
+static int clusterNodeCronHandleReconnect(clusterNode *node, mstime_t handshake_timeout, mstime_t now) {        //ldc:检查是否有 disconnected nodes 并且重新建立连接
     /* Not interested in reconnecting the link with myself or nodes
      * for which we have no address. */
-    if (node->flags & (CLUSTER_NODE_MYSELF|CLUSTER_NODE_NOADDR)) return 1;
+    if (node->flags & (CLUSTER_NODE_MYSELF|CLUSTER_NODE_NOADDR)) return 1;      //ldc:忽略掉 myself 和 noaddr 状态的节点
 
     if (node->flags & CLUSTER_NODE_PFAIL)
         server.cluster->stats_pfail_nodes++;
 
     /* A Node in HANDSHAKE state has a limited lifespan equal to the
      * configured node timeout. */
-    if (nodeInHandshake(node) && now - node->ctime > handshake_timeout) {       //ldc:握手超时，则从集群中删除该节点
+    if (nodeInHandshake(node) && now - node->ctime > handshake_timeout) {       //ldc:节点处于 handshake 状态，且状态维持时间超过 handshake_timeout，那么从 nodes中删掉它
         clusterDelNode(node);
         return 1;
     }
 
-    if (node->link == NULL) {
+    if (node->link == NULL) {       //ldc:刚刚收到 cluster meet 命令创建的新 node ，或是 server 刚启动，或是由于某种原因断开了
         clusterLink *link = createClusterLink(node);
         link->conn = server.tls_cluster ? connCreateTLS() : connCreateSocket();
         connSetPrivateData(link->conn, link);
@@ -4040,7 +4040,7 @@ void clusterCron(void) {
         clusterNodeCronUpdateClusterLinksMemUsage(node);
         /* The protocol is that function(s) below return non-zero if the node was
          * terminated.
-         */
+         */        //ldc:检查是否有 disconnected nodes 并且重新建立连接
         if(clusterNodeCronHandleReconnect(node, handshake_timeout, now)) continue;      //ldc:对于自身或者无法连接的节点进行剔除，仅保留可达的节点，clusterNodeCronHandleReconnect 函数中包含真正创建连接进行pingpong的可达性测试
     }
     dictReleaseIterator(di); 

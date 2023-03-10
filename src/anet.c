@@ -335,7 +335,7 @@ static int anetTcpGenericConnect(char *err, const char *addr, int port,
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {        //ldc:进行连接
             /* If the socket is non-blocking, it is ok for connect() to
              * return an EINPROGRESS error here. */
-            if (errno == EINPROGRESS && flags & ANET_CONNECT_NONBLOCK)
+            if (errno == EINPROGRESS && flags & ANET_CONNECT_NONBLOCK)      //ldc:socket被设置未非阻塞时，connect函数会立即返回，但此时已经发起的TCP三次握手仍在进行，所以connect会返回一个EINPROGRESS错误，表示操作正在进行中(Operation now in progress)
                 goto end;
             close(s);
             s = ANET_ERR;

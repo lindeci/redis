@@ -307,7 +307,7 @@ static int anetTcpGenericConnect(char *err, const char *addr, int port,
         /* Try to create the socket and to connect it.
          * If we fail in the socket() call, or on connect(), we retry with
          * the next entry in servinfo. */
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)     //ldc:创建socket
             continue;
         if (anetSetReuseAddr(err,s) == ANET_ERR) goto error;
         if (flags & ANET_CONNECT_NONBLOCK && anetNonBlock(err,s) != ANET_OK)
@@ -332,7 +332,7 @@ static int anetTcpGenericConnect(char *err, const char *addr, int port,
                 goto error;
             }
         }
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {        //ldc:进行连接
             /* If the socket is non-blocking, it is ok for connect() to
              * return an EINPROGRESS error here. */
             if (errno == EINPROGRESS && flags & ANET_CONNECT_NONBLOCK)
@@ -344,7 +344,7 @@ static int anetTcpGenericConnect(char *err, const char *addr, int port,
 
         /* If we ended an iteration of the for loop without errors, we
          * have a connected socket. Let's return to the caller. */
-        goto end;
+        goto end;       //ldc:如果有可用的连接,则退出循环
     }
     if (p == NULL)
         anetSetError(err, "creating socket: %s", strerror(errno));
@@ -361,7 +361,7 @@ end:
     /* Handle best effort binding: if a binding address was used, but it is
      * not possible to create a socket, try again without a binding address. */
     if (s == ANET_ERR && source_addr && (flags & ANET_CONNECT_BE_BINDING)) {
-        return anetTcpGenericConnect(err,addr,port,NULL,flags);
+        return anetTcpGenericConnect(err,addr,port,NULL,flags);     //ldc:如果是flags包含ANET_CONNECT_BE_BINDING，则递归，直到连接成功位置
     } else {
         return s;
     }

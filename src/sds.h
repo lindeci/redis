@@ -84,7 +84,7 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
 
-static inline size_t sdslen(const sds s) {
+static inline size_t sdslen(const sds s) {      //ldc:获取已经使用的长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -101,7 +101,7 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
-static inline size_t sdsavail(const sds s) {
+static inline size_t sdsavail(const sds s) {      //ldc:分配但未使用的长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5: {
@@ -127,7 +127,7 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
-static inline void sdssetlen(sds s, size_t newlen) {
+static inline void sdssetlen(sds s, size_t newlen) {      //ldc:设置已经使用长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -151,7 +151,7 @@ static inline void sdssetlen(sds s, size_t newlen) {
     }
 }
 
-static inline void sdsinclen(sds s, size_t inc) {
+static inline void sdsinclen(sds s, size_t inc) {      //ldc:增加已经使用长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -177,7 +177,7 @@ static inline void sdsinclen(sds s, size_t inc) {
 }
 
 /* sdsalloc() = sdsavail() + sdslen() */
-static inline size_t sdsalloc(const sds s) {
+static inline size_t sdsalloc(const sds s) {      //ldc:设置分配的长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -194,7 +194,7 @@ static inline size_t sdsalloc(const sds s) {
     return 0;
 }
 
-static inline void sdssetalloc(sds s, size_t newlen) {
+static inline void sdssetalloc(sds s, size_t newlen) {      //ldc:设置分配的长度
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -215,10 +215,10 @@ static inline void sdssetalloc(sds s, size_t newlen) {
     }
 }
 
-sds sdsnewlen(const void *init, size_t initlen);
+sds sdsnewlen(const void *init, size_t initlen);        //ldc:创建一个包含给定C字符串的SDS
 sds sdstrynewlen(const void *init, size_t initlen);
 sds sdsnew(const char *init);
-sds sdsempty(void);
+sds sdsempty(void);        //ldc:创建一个空的SDS
 sds sdsdup(const sds s);
 void sdsfree(sds s);
 sds sdsgrowzero(sds s, size_t len);
@@ -267,7 +267,7 @@ sds sdstemplate(const char *template, sdstemplate_callback_t cb_func, void *cb_a
 sds sdsMakeRoomFor(sds s, size_t addlen);
 sds sdsMakeRoomForNonGreedy(sds s, size_t addlen);
 void sdsIncrLen(sds s, ssize_t incr);
-sds sdsRemoveFreeSpace(sds s);
+sds sdsRemoveFreeSpace(sds s);     //ldc:去除sds字符串中未使用的空间
 sds sdsResize(sds s, size_t size);
 size_t sdsAllocSize(sds s);
 void *sdsAllocPtr(sds s);

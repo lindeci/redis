@@ -128,8 +128,8 @@ typedef struct clusterNode {
                                     if we don't have the master node in our
                                     tables. */
     unsigned long long last_in_ping_gossip; /* The number of the last carried in the ping gossip section */     //ldc:上一次ping gossip section收到的个数
-    mstime_t ping_sent;      /* Unix time we sent latest ping */     //ldc:当前节点最后一次向该节点发送 PING 消息的时间
-    mstime_t pong_received;  /* Unix time we received the pong */     //ldc:当前节点最后一次收到该节点 PONG 消息的时间
+    mstime_t ping_sent;      /* Unix time we sent latest ping */     //ldc:最近一次发送PING消息的时间
+    mstime_t pong_received;  /* Unix time we received the pong */     //ldc:收到pong消息的时间
     mstime_t data_received;  /* Unix time we received any data */     //ldc:上次收到任何数据的时间
     mstime_t fail_time;      /* Unix time when FAIL flag was set */     //ldc:FAIL 标志位被设置的时间
     mstime_t voted_time;     /* Last time we voted for a slave of this master */     //ldc:上次为这master选slave的时间
@@ -138,13 +138,13 @@ typedef struct clusterNode {
     long long repl_offset;      /* Last known repl offset for this node. */     //ldc:这个节点的上次repl offset
     char ip[NET_IP_STR_LEN];    /* Latest known IP address of this node */     //ldc:节点的IP 地址
     sds hostname;               /* The known hostname for this node */     //ldc:hostname
-    int port;                   /* Latest known clients port (TLS or plain). */     //ldc:可能是tls端口
-    int pport;                  /* Latest known clients plaintext port. Only used     //ldc:可能是tls端口
+    int port;                   /* Latest known clients port (TLS or plain). */     //ldc:客户端通信端口
+    int pport;                  /* Latest known clients plaintext port. Only used     //ldc:使用TLS协议的端口
                                    if the main clients port is for TLS. */
-    int cport;                  /* Latest known cluster port of this node. */     //ldc:端口
+    int cport;                  /* Latest known cluster port of this node. */     //ldc:集群通信端口
     clusterLink *link;          /* TCP/IP link established toward this node */     //ldc:TCP/IP link
     clusterLink *inbound_link;  /* TCP/IP link accepted from this node */     //ldc:TCP/IP link
-    list *fail_reports;         /* List of nodes signaling this as failing */     //ldc:下线记录列表
+    list *fail_reports;         /* List of nodes signaling this as failing */     //ldc:下线列表
 } clusterNode;
 
 /* Slot to keys for a single slot. The keys in the same slot are linked together
@@ -215,13 +215,13 @@ typedef struct clusterState {
  * address for all the next messages. */
 typedef struct {
     char nodename[CLUSTER_NAMELEN];     //ldc:节点的 nodeId
-    uint32_t ping_sent;     //ldc:最后一次向该节点发送 ping 消息时间
-    uint32_t pong_received;     //ldc:最后一次接收该节点 pong 消息时间
-    char ip[NET_IP_STR_LEN];  /* IP address last time it was seen */
-    uint16_t port;              /* base port last time it was seen */
+    uint32_t ping_sent;     //ldc:最近一次sender节点给该节点发送ping的时间点。收到pong回复后ping_sent会被赋值为0
+    uint32_t pong_received;     //ldc:最近一次sender节点收到该节点发送pong的时间点
+    char ip[NET_IP_STR_LEN];  /* IP address last time it was seen */        //ldc:用于客户端通信的端口
+    uint16_t port;              /* base port last time it was seen */       //ldc:集群间通信的端口
     uint16_t cport;             /* cluster port last time it was seen */
     uint16_t flags;             /* node->flags copy */      //ldc:节点标识
-    uint16_t pport;             /* plaintext-port, when base port is TLS */
+    uint16_t pport;             /* plaintext-port, when base port is TLS */     //ldc:使用TLS协议时的端口
     uint16_t notused1;
 } clusterMsgDataGossip;
 
@@ -306,30 +306,30 @@ union clusterMsgData {
 #define CLUSTER_PROTO_VER 1 /* Cluster bus protocol version. */
 
 typedef struct {
-    char sig[4];        /* Signature "RCmb" (Redis Cluster message bus). */     //ldc:信号标示
-    uint32_t totlen;    /* Total length of this message */      //ldc:消息总长度
-    uint16_t ver;       /* Protocol version, currently set to 1. */     //ldc:协议版本
-    uint16_t port;      /* TCP base port number. */
-    uint16_t type;      /* Message type */      //ldc:消息类型 , 用于区分 meet,ping,pong 等消息
-    uint16_t count;     /* Only used for some kind of messages. */      //ldc:消息体包含的节点数量，仅用于 meet,ping,ping 消息类型
-    uint64_t currentEpoch;  /* The epoch accordingly to the sending node. */        //ldc:当前发送节点的配置纪元
-    uint64_t configEpoch;   /* The config epoch if it's a master, or the last       //ldc:主节点的纪元，或者 从节点从主节点获取的纪元
+    char sig[4];        /* Signature "RCmb" (Redis Cluster message bus). */     //ldc:sender的基本信息-"RCmb"签名
+    uint32_t totlen;    /* Total length of this message */      //ldc:sender的基本信息-消息总长度
+    uint16_t ver;       /* Protocol version, currently set to 1. */     //ldc:sender的基本信息-协议版本
+    uint16_t port;      /* TCP base port number. */     //ldc:sender的基本信息-客户端端口
+    uint16_t type;      /* Message type */      //ldc:sender的基本信息-消息类型 , 用于区分 meet,ping,pong 等消息
+    uint16_t count;     /* Only used for some kind of messages. */      //ldc:sender的基本信息-消息体包含的节点数量，仅用于 meet,ping,ping 消息类型
+    uint64_t currentEpoch;  /* The epoch accordingly to the sending node. */        //ldc:集群视图-当前发送节点的配置纪元
+    uint64_t configEpoch;   /* The config epoch if it's a master, or the last       //ldc:集群视图-主节点的纪元，或者 从节点从主节点获取的纪元
                                epoch advertised by its master if it is a
                                slave. */
-    uint64_t offset;    /* Master replication offset if node is a master or     //ldc:复制偏移量
+    uint64_t offset;    /* Master replication offset if node is a master or     //ldc:sender的基本信息-复制偏移量
                            processed replication offset if node is a slave. */
-    char sender[CLUSTER_NAMELEN]; /* Name of the sender node */     //ldc:发送节点的 nodeId
-    unsigned char myslots[CLUSTER_SLOTS/8];     //ldc:发送节点负责的槽信息
-    char slaveof[CLUSTER_NAMELEN];      //ldc:如果发送节点是从节点，记录对应主节点的 nodeId
-    char myip[NET_IP_STR_LEN];    /* Sender IP, if not all zeroed. */
+    char sender[CLUSTER_NAMELEN]; /* Name of the sender node */     //ldc:sender的基本信息-发送节点的 nodeId
+    unsigned char myslots[CLUSTER_SLOTS/8];     //ldc:sender的基本信息-发送节点负责的槽信息
+    char slaveof[CLUSTER_NAMELEN];      //ldc:sender的基本信息-如果发送节点是从节点，记录对应主节点的 nodeId
+    char myip[NET_IP_STR_LEN];    /* Sender IP, if not all zeroed. */       //ldc:sender的基本信息-发送消息节点的ip
     uint16_t extensions; /* Number of extensions sent along with this packet. */
-    char notused1[30];   /* 30 bytes reserved for future usage. */
-    uint16_t pport;      /* Sender TCP plaintext port, if base port is TLS */
-    uint16_t cport;      /* Sender TCP cluster bus port */
-    uint16_t flags;      /* Sender node flags */        //ldc:发送节点标识 , 区分主从角色，是否下线等
-    unsigned char state; /* Cluster state from the POV of the sender */     //ldc:发送节点所处的集群状态
-    unsigned char mflags[3]; /* Message flags: CLUSTERMSG_FLAG[012]_... */      //ldc:消息标识
-    union clusterMsgData data;      //ldc:消息正文
+    char notused1[30];   /* 30 bytes reserved for future usage. */      //ldc:sender的基本信息-32字节的保留数据
+    uint16_t pport;      /* Sender TCP plaintext port, if base port is TLS */       //ldc:sender的基本信息-使用TLS协议时的端口
+    uint16_t cport;      /* Sender TCP cluster bus port */      //ldc:sender的基本信息-发送消息节点的集群总线端口，也就是用于集群间通信的端口
+    uint16_t flags;      /* Sender node flags */        //ldc:sender的基本信息-发送节点标识 , 区分主从角色，是否下线等
+    unsigned char state; /* Cluster state from the POV of the sender */     //ldc:sender的基本信息-发送节点所处的集群状态
+    unsigned char mflags[3]; /* Message flags: CLUSTERMSG_FLAG[012]_... */      //ldc:sender的基本信息-消息标识  CLUSTERMSG_FLAG[012]_...
+    union clusterMsgData data;      //ldc:具体的消息-集群通信的实际消息
 } clusterMsg;
 
 /* clusterMsg defines the gossip wire protocol exchanged among Redis cluster

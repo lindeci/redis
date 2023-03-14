@@ -1714,7 +1714,7 @@ void clusterProcessGossipSection(clusterMsg *hdr, clusterLink *link) {      //ld
              * can talk with this other node, update the address, disconnect
              * the old link if any, so that we'll attempt to connect with the
              * new address. */
-            if (node->flags & (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL) &&     //ldc:如果node节点不是FAIL、PFAIL、NOADDR状态，并且node的ip或者端口与g节点中的ip或者端口不一致，需要更新node中的ip和端口
+            if (node->flags & (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL) &&     //ldc:如果node节点不是FAIL、PFAIL、NOADDR状态，并且node的ip或者端口与g节点中的ip或者端口不一致，需要更新node中的ip、端口和flag
                 !(flags & CLUSTER_NODE_NOADDR) &&       //ldc:需要注意node节点和g节点的区别，node节点是从当前收到消息节点中根据节点id查找到的节点，也就是接收者自己记录的节点信息
                 !(flags & (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL)) &&        //ldc:g指向当前在遍历的那个gossip节点，也就是发送者带过来的节点信息
                 (strcasecmp(node->ip,g->ip) ||
@@ -3003,7 +3003,7 @@ void clusterSendPing(clusterLink *link, int type) {     //ldc:用于向指定节
     }
 
     /* If there are PFAIL nodes, add them at the end. */
-    if (pfail_wanted) {
+    if (pfail_wanted) {     //ldc:把PFAIL的节点添加到clusterMsg末尾
         dictIterator *di;
         dictEntry *de;
 

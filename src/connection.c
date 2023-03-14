@@ -242,8 +242,8 @@ static int connSocketSetWriteHandler(connection *conn, ConnectionCallbackFunc fu
     if (!conn->write_handler)       //ldc:如果没有设置可写事件处理函数,则取消关注可写事件
         aeDeleteFileEvent(server.el,conn->fd,AE_WRITABLE);
     else
-        if (aeCreateFileEvent(server.el,conn->fd,AE_WRITABLE,       //ldc:关注可写事件
-                    conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
+        if (aeCreateFileEvent(server.el,conn->fd,AE_WRITABLE,       //ldc:关注可写事件,执行epoll_ctl的EPOLL_CTL_MOD,强制触发epoll的EPOLLOUT事件,一般是发送大网络包时使用.小网络包直接socket write.
+                    conn->type->ae_handler,conn) == AE_ERR) return C_ERR;       //ldc:EPOLLOUT触发条件:1、某次write，写满了发送缓冲区，返回错误码为EAGAIN 2、对端读取了一些数据，又重新可写了，此时会触发EPOLLOUT
     return C_OK;
 }
 

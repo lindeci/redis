@@ -1039,7 +1039,7 @@ int clusterNodeAddFailureReport(clusterNode *failing, clusterNode *sender) {
  * flagged as FAIL we need to have a local PFAIL state that is at least
  * older than the global node timeout, so we don't just trust the number
  * of failure reports from other nodes. */
-void clusterNodeCleanupFailureReports(clusterNode *node) {
+void clusterNodeCleanupFailureReports(clusterNode *node) {      //ldc:剔除FailReport时间低于server.cluster_node_timeout*2的节点
     list *l = node->fail_reports;
     listNode *ln;
     listIter li;
@@ -1090,7 +1090,7 @@ int clusterNodeDelFailureReport(clusterNode *node, clusterNode *sender) {
  * not including this node, that may have a PFAIL or FAIL state for this
  * node as well. */
 int clusterNodeFailureReportsCount(clusterNode *node) {
-    clusterNodeCleanupFailureReports(node);
+    clusterNodeCleanupFailureReports(node);     //ldc:剔除FailReport时间低于server.cluster_node_timeout*2的节点
     return listLength(node->fail_reports);
 }
 
@@ -1498,10 +1498,10 @@ int clusterBlacklistExists(char *nodeid) {
  */
 void markNodeAsFailingIfNeeded(clusterNode *node) {
     int failures;
-    int needed_quorum = (server.cluster->size / 2) + 1;
+    int needed_quorum = (server.cluster->size / 2) + 1;     //ldc:需要的票数要过半
 
-    if (!nodeTimedOut(node)) return; /* We can reach it. */
-    if (nodeFailed(node)) return; /* Already FAILing. */
+    if (!nodeTimedOut(node)) return; /* We can reach it. */     //ldc:如果没有主观下线则返回
+    if (nodeFailed(node)) return; /* Already FAILing. */        //ldc:如果已经下线则返回
 
     failures = clusterNodeFailureReportsCount(node);
     /* Also count myself as a voter if I'm a master. */
@@ -1512,8 +1512,8 @@ void markNodeAsFailingIfNeeded(clusterNode *node) {
         "Marking node %.40s as failing (quorum reached).", node->name);
 
     /* Mark the node as failing. */
-    node->flags &= ~CLUSTER_NODE_PFAIL;
-    node->flags |= CLUSTER_NODE_FAIL;
+    node->flags &= ~CLUSTER_NODE_PFAIL;     //ldc:相当设置为非PFAIL
+    node->flags |= CLUSTER_NODE_FAIL;       //ldc:相当设置为FAIL
     node->fail_time = mstime();
 
     /* Broadcast the failing node name to everybody, forcing all the other
@@ -1644,7 +1644,7 @@ int clusterStartHandshake(char *ip, int port, int cport) {
  * Note that this function assumes that the packet is already sanity-checked
  * by the caller, not in the content of the gossip section, but in the
  * length. */
-void clusterProcessGossipSection(clusterMsg *hdr, clusterLink *link) {      //ldc:处理clusterMsg中的Gossip节点信息
+void clusterProcessGossipSection(clusterMsg *hdr, clusterLink *link) {      //ldc:处理clusterMsg中的Gossip节点信息. 1、更新收到pong消息时间 2、
     uint16_t count = ntohs(hdr->count);
     clusterMsgDataGossip *g = (clusterMsgDataGossip*) hdr->data.ping.gossip;        //ldc:获取clusterMsgDataGossip数据
     clusterNode *sender = link->node ? link->node : clusterLookupNode(hdr->sender, CLUSTER_NAMELEN);        //ldc:发送消息的节点
@@ -1700,7 +1700,7 @@ void clusterProcessGossipSection(clusterMsg *hdr, clusterLink *link) {      //ld
 
                 /* Replace the pong time with the received one only if
                  * it's greater than our view but is not in the future
-                 * (with 500 milliseconds tolerance) from the POV of our
+                 * (with 500 milliseconds tolerance) from the POV of our        //ldc:POV翻译:Persistance of Vision 视觉持久性，允许服务器之间500毫秒误差
                  * clock. */
                 if (pongtime <= (server.mstime+500) &&
                     pongtime > node->pong_received)
@@ -2069,7 +2069,7 @@ void clusterProcessPingExtensions(clusterMsg *hdr, clusterLink *link) {
     updateAnnouncedHostname(sender, ext_hostname);
 }
 
-static clusterNode *getNodeFromLinkAndMsg(clusterLink *link, clusterMsg *hdr) {
+static clusterNode *getNodeFromLinkAndMsg(clusterLink *link, clusterMsg *hdr) {     //ldc:如果已知道非握手节点，则sender = link->node; 否则到server.cluster->nodes中查找
     clusterNode *sender;
     if (link->node && !nodeInHandshake(link->node)) {
         /* If the link has an associated node, use that so that we don't have to look it
@@ -2129,12 +2129,12 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
     uint32_t explen; /* expected length of this packet */
     clusterNode *sender;
 
-    if (type == CLUSTERMSG_TYPE_PING || type == CLUSTERMSG_TYPE_PONG ||
+    if (type == CLUSTERMSG_TYPE_PING || type == CLUSTERMSG_TYPE_PONG ||       //ldc:检查接受包是否有额外的数据
         type == CLUSTERMSG_TYPE_MEET)
     {
         uint16_t count = ntohs(hdr->count);
 
-        explen = sizeof(clusterMsg)-sizeof(union clusterMsgData);
+        explen = sizeof(clusterMsg)-sizeof(union clusterMsgData);       //ldc:计算包的预期长度
         explen += (sizeof(clusterMsgDataGossip)*count);
 
         /* If there is extension data, which doesn't have a fixed length,
@@ -2184,7 +2184,7 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
         explen = totlen;
     }
 
-    if (totlen != explen) {
+    if (totlen != explen) {     //ldc:如果预期长度跟接受消息长度不一致，则退出
         serverLog(LL_WARNING, "Received invalid %s packet of length %lld but expected length %lld", 
             clusterGetMessageTypeString(type), (unsigned long long) totlen, (unsigned long long) explen);
         return 1;
@@ -2198,9 +2198,9 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
      * because of Pub/Sub. */
     if (sender) sender->data_received = now;        //ldc:更新发送者收到数据的时间
 
-    if (sender && !nodeInHandshake(sender)) {
-        /* Update our currentEpoch if we see a newer epoch in the cluster. */
-        senderCurrentEpoch = ntohu64(hdr->currentEpoch);
+    if (sender && !nodeInHandshake(sender)) {       //ldc:如果currentEpoch、configEpoch变大，则更新它们两
+        /* Update our currentEpoch if we see a newer epoch in the cluster. */      //ldc:如果发送者CurrentEpoch>server.cluster->currentEpoch,则更新server.cluster->currentEpoch = senderCurrentEpoch;
+        senderCurrentEpoch = ntohu64(hdr->currentEpoch);        //ldc:在初始化时是 hdr->currentEpoch = htonu64(server.cluster->currentEpoch);   hdr->configEpoch = htonu64(master->configEpoch);
         senderConfigEpoch = ntohu64(hdr->configEpoch);
         if (senderCurrentEpoch > server.cluster->currentEpoch)
             server.cluster->currentEpoch = senderCurrentEpoch;
@@ -2211,7 +2211,7 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
                                  CLUSTER_TODO_FSYNC_CONFIG);
         }
         /* Update the replication offset info for this node. */
-        sender->repl_offset = ntohu64(hdr->offset);
+        sender->repl_offset = ntohu64(hdr->offset);     //ldc:更新sender->repl_offset
         sender->repl_offset_time = now;
         /* If we are a slave performing a manual failover and our master
          * sent its offset while already paused, populate the MF state. */
@@ -2431,7 +2431,7 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
         if (sender) {
             sender_master = nodeIsMaster(sender) ? sender : sender->slaveof;
             if (sender_master) {
-                dirty_slots = memcmp(sender_master->slots,
+                dirty_slots = memcmp(sender_master->slots,      //ldc:memcmp功能是比较内存区域buf1和buf2的前count个字节，其结果为按字节进行对比
                         hdr->myslots,sizeof(hdr->myslots)) != 0;
             }
         }
@@ -2439,7 +2439,7 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
         /* 1) If the sender of the message is a master, and we detected that
          *    the set of slots it claims changed, scan the slots to see if we
          *    need to update our configuration. */
-        if (sender && nodeIsMaster(sender) && dirty_slots)
+        if (sender && nodeIsMaster(sender) && dirty_slots)      //ldc:如果slots不一致则更新
             clusterUpdateSlotsConfigWith(sender,senderConfigEpoch,hdr->myslots);
 
         /* 2) We also check for the reverse condition, that is, the sender
@@ -2488,7 +2488,7 @@ int clusterProcessPacket(clusterLink *link) {       //ldc:有许多if else分支
 
         /* If our config epoch collides with the sender's try to fix
          * the problem. */
-        if (sender &&
+        if (sender &&       //ldc:如果发送者ConfigEpoch跟 myself->configEpoch冲突
             nodeIsMaster(myself) && nodeIsMaster(sender) &&
             senderConfigEpoch == myself->configEpoch)
         {

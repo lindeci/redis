@@ -1746,69 +1746,69 @@ struct redisServer {
     int shutdown_on_sigterm;        /* Shutdown flags configured for SIGTERM. */      //ldc:SIGTERM信号shutdown
 
     /* Replication (master) */
-    char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */
-    char replid2[CONFIG_RUN_ID_SIZE+1]; /* replid inherited from master*/
-    long long master_repl_offset;   /* My current replication offset */
-    long long second_replid_offset; /* Accept offsets up to this for replid2. */
-    int slaveseldb;                 /* Last SELECTed DB in replication output */
-    int repl_ping_slave_period;     /* Master pings the slave every N seconds */
-    replBacklog *repl_backlog;      /* Replication backlog for partial syncs */
-    long long repl_backlog_size;    /* Backlog circular buffer size */
-    time_t repl_backlog_time_limit; /* Time without slaves after the backlog
+    char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */        //ldc:自己当前的replication ID
+    char replid2[CONFIG_RUN_ID_SIZE+1]; /* replid inherited from master*/       //ldc:master的replication ID
+    long long master_repl_offset;   /* My current replication offset */     //ldc:应用的偏移量
+    long long second_replid_offset; /* Accept offsets up to this for replid2. */        //ldc:接收的偏移量
+    int slaveseldb;                 /* Last SELECTed DB in replication output */        //ldc:选择的db
+    int repl_ping_slave_period;     /* Master pings the slave every N seconds */        //ldc:主从心跳ping的时间间隔.默认10
+    replBacklog *repl_backlog;      /* Replication backlog for partial syncs */     //ldc:backlog
+    long long repl_backlog_size;    /* Backlog circular buffer size */      //ldc:主节点保存操作日志的大小。默认1M
+    time_t repl_backlog_time_limit; /* Time without slaves after the backlog        //ldc:主节点保存操作日志的时间。默认3600秒
                                        gets released. */
-    time_t repl_no_slaves_since;    /* We have no slaves since that time.
+    time_t repl_no_slaves_since;    /* We have no slaves since that time.       //ldc:没有从库的开始时间
                                        Only valid if server.slaves len is 0. */
-    int repl_min_slaves_to_write;   /* Min number of slaves to write. */
-    int repl_min_slaves_max_lag;    /* Max lag of <count> slaves to write. */
-    int repl_good_slaves_count;     /* Number of slaves with lag <= max_lag. */
-    int repl_diskless_sync;         /* Master send RDB to slaves sockets directly. */
-    int repl_diskless_load;         /* Slave parse RDB directly from the socket.
+    int repl_min_slaves_to_write;   /* Min number of slaves to write. */        //ldc:最少同步的从库个数
+    int repl_min_slaves_max_lag;    /* Max lag of <count> slaves to write. */       //ldc:最多同步的从库个数
+    int repl_good_slaves_count;     /* Number of slaves with lag <= max_lag. */     //ldc:有效从库个数
+    int repl_diskless_sync;         /* Master send RDB to slaves sockets directly. */       //ldc:RDB不需要落盘，通过socket传给slave
+    int repl_diskless_load;         /* Slave parse RDB directly from the socket.        //ldc:REPL_DISKLESS_LOAD_DISABLED、REPL_DISKLESS_LOAD_WHEN_DB_EMPTY、REPL_DISKLESS_LOAD_SWAPDB
                                      * see REPL_DISKLESS_LOAD_* enum */
-    int repl_diskless_sync_delay;   /* Delay to start a diskless repl BGSAVE. */
-    int repl_diskless_sync_max_replicas;/* Max replicas for diskless repl BGSAVE
+    int repl_diskless_sync_delay;   /* Delay to start a diskless repl BGSAVE. */        //ldc:无盘延迟同步时间(秒)
+    int repl_diskless_sync_max_replicas;/* Max replicas for diskless repl BGSAVE        //ldc:无盘延迟同步的最大从库个数
                                          * delay (start sooner if they all connect). */
-    size_t repl_buffer_mem;         /* The memory of replication buffer. */
+    size_t repl_buffer_mem;         /* The memory of replication buffer. */     //ldc:从库的buffer大小
     list *repl_buffer_blocks;       /* Replication buffers blocks list
                                      * (serving replica clients and repl backlog) */
     /* Replication (slave) */
-    char *masteruser;               /* AUTH with this user and masterauth with master */
-    sds masterauth;                 /* AUTH with this password with master */
-    char *masterhost;               /* Hostname of master */
-    int masterport;                 /* Port of master */
-    int repl_timeout;               /* Timeout after N seconds of master idle */
-    client *master;     /* Client that is master for this slave */
-    client *cached_master; /* Cached master to be reused for PSYNC. */
-    int repl_syncio_timeout; /* Timeout for synchronous I/O calls */
-    int repl_state;          /* Replication status if the instance is a slave */
-    off_t repl_transfer_size; /* Size of RDB to read from master during sync. */
-    off_t repl_transfer_read; /* Amount of RDB read from master during sync. */
-    off_t repl_transfer_last_fsync_off; /* Offset when we fsync-ed last time. */
-    connection *repl_transfer_s;     /* Slave -> Master SYNC connection */
-    int repl_transfer_fd;    /* Slave -> Master SYNC temp file descriptor */
-    char *repl_transfer_tmpfile; /* Slave-> master SYNC temp file name */
-    time_t repl_transfer_lastio; /* Unix time of the latest read, for timeout */
-    int repl_serve_stale_data; /* Serve stale data when link is down? */
-    int repl_slave_ro;          /* Slave is read only? */
-    int repl_slave_ignore_maxmemory;    /* If true slaves do not evict. */
-    time_t repl_down_since; /* Unix time at which link with master went down */
-    int repl_disable_tcp_nodelay;   /* Disable TCP_NODELAY after SYNC? */
-    int slave_priority;             /* Reported in INFO and used by Sentinel. */
-    int replica_announced;          /* If true, replica is announced by Sentinel */
-    int slave_announce_port;        /* Give the master this listening port. */
-    char *slave_announce_ip;        /* Give the master this ip address. */
-    int propagation_error_behavior; /* Configures the behavior of the replica
+    char *masteruser;               /* AUTH with this user and masterauth with master */        //ldc:授权给主库的用户
+    sds masterauth;                 /* AUTH with this password with master */        //ldc:授权给主库的密码
+    char *masterhost;               /* Hostname of master */        //ldc:主库的IP
+    int masterport;                 /* Port of master */        //ldc:主库的端口
+    int repl_timeout;               /* Timeout after N seconds of master idle */        //ldc:从节点超时时间。默认60
+    client *master;     /* Client that is master for this slave */      //ldc:这个从库的master client
+    client *cached_master; /* Cached master to be reused for PSYNC. */      //ldc:用于PSYNC的缓存master
+    int repl_syncio_timeout; /* Timeout for synchronous I/O calls */        //ldc:同步IO CALL的超时时间
+    int repl_state;          /* Replication status if the instance is a slave */        //ldc:从库状态，比如REPL_STATE_CONNECT、REPL_STATE_CONNECTING
+    off_t repl_transfer_size; /* Size of RDB to read from master during sync. */        //ldc:读取的rdb大小
+    off_t repl_transfer_read; /* Amount of RDB read from master during sync. */     //ldc:读取rdb的次数
+    off_t repl_transfer_last_fsync_off; /* Offset when we fsync-ed last time. */        //ldc:读取rdb时，上次完成fsync的偏移量
+    connection *repl_transfer_s;     /* Slave -> Master SYNC connection */      //ldc:Slave -> Master SYNC connection
+    int repl_transfer_fd;    /* Slave -> Master SYNC temp file descriptor */        //ldc:Slave -> Master SYNC temp file descriptor
+    char *repl_transfer_tmpfile; /* Slave-> master SYNC temp file name */       //ldc:Slave-> master SYNC 临时文件名
+    time_t repl_transfer_lastio; /* Unix time of the latest read, for timeout */        //ldc:上次读取的时间
+    int repl_serve_stale_data; /* Serve stale data when link is down? */        //ldc:link断开后是否提供服务
+    int repl_slave_ro;          /* Slave is read only? */       //ldc:L从库是否只读
+    int repl_slave_ignore_maxmemory;    /* If true slaves do not evict. */      //ldc:从库是否忽略淘汰机制
+    time_t repl_down_since; /* Unix time at which link with master went down */     //ldc:link断开的开始时间
+    int repl_disable_tcp_nodelay;   /* Disable TCP_NODELAY after SYNC? */       //ldc:sync后是否设置TCP_NODELAY，假如设置成yes，则redis会合并小的TCP包从而节省带宽，但会增加同步延迟（40ms）
+    int slave_priority;             /* Reported in INFO and used by Sentinel. */        //ldc:提供给Sentinel的优先级
+    int replica_announced;          /* If true, replica is announced by Sentinel */     //ldc:是否提供给Sentinel使用
+    int slave_announce_port;        /* Give the master this listening port. */       //ldc:提供给主库的监听端口
+    char *slave_announce_ip;        /* Give the master this ip address. */      //ldc:提供给主库的IP
+    int propagation_error_behavior; /* Configures the behavior of the replica       //ldc:收到错误的replication stream后，设置的错误码
                                      * when it receives an error on the replication stream */
-    int repl_ignore_disk_write_error;   /* Configures whether replicas panic when unable to
+    int repl_ignore_disk_write_error;   /* Configures whether replicas panic when unable to     //ldc:是否忽略从库AOF刷屏失败
                                          * persist writes to AOF. */
     /* The following two fields is where we store master PSYNC replid/offset
      * while the PSYNC is in progress. At the end we'll copy the fields into
      * the server->master client structure. */
-    char master_replid[CONFIG_RUN_ID_SIZE+1];  /* Master PSYNC runid. */
-    long long master_initial_offset;           /* Master PSYNC offset. */
-    int repl_slave_lazy_flush;          /* Lazy FLUSHALL before loading DB? */
+    char master_replid[CONFIG_RUN_ID_SIZE+1];  /* Master PSYNC runid. */        //ldc:master psync的runid
+    long long master_initial_offset;           /* Master PSYNC offset. */       //ldc:Master PSYNC offset.
+    int repl_slave_lazy_flush;          /* Lazy FLUSHALL before loading DB? */      //ldc:装载DB时是否开始懒惰FLUSHALL
     /* Synchronous replication. */
-    list *clients_waiting_acks;         /* Clients waiting in WAIT command. */
-    int get_ack_from_slaves;            /* If true we send REPLCONF GETACK. */
+    list *clients_waiting_acks;         /* Clients waiting in WAIT command. */      //ldc:waiting的client列表
+    int get_ack_from_slaves;            /* If true we send REPLCONF GETACK. */      //ldc:是否需要从库ack
     /* Limits */
     unsigned int maxclients;            /* Max number of simultaneous clients */      //ldc:最大连接数
     unsigned long long maxmemory;   /* Max number of memory bytes to use */      //ldc:最大内存容量

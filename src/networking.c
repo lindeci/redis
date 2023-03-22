@@ -1972,7 +1972,7 @@ int writeToClient(client *c, int handler_installed) {       //ldc:把c->buf回�
          * Moreover, we also send as much as possible if the client is
          * a slave or a monitor (otherwise, on high-speed traffic, the
          * replication/output buffer will grow indefinitely) */
-        if (totwritten > NET_MAX_WRITES_PER_EVENT &&
+        if (totwritten > NET_MAX_WRITES_PER_EVENT &&        //ldc:限制每次write包最大为1024*64
             (server.maxmemory == 0 ||
              zmalloc_used_memory() < server.maxmemory) &&
             !(c->flags & CLIENT_SLAVE)) break;
@@ -1999,7 +1999,7 @@ int writeToClient(client *c, int handler_installed) {       //ldc:把c->buf回�
          * We just rely on data / pings received for timeout detection. */
         if (!(c->flags & CLIENT_MASTER)) c->lastinteraction = server.unixtime;
     }
-    if (!clientHasPendingReplies(c)) {
+    if (!clientHasPendingReplies(c)) {      //ldc:如果c->reply的内容为空，则删除epollout事件
         c->sentlen = 0;
         /* Note that writeToClient() is called in a threaded way, but
          * aeDeleteFileEvent() is not thread safe: however writeToClient()

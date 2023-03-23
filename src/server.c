@@ -3471,17 +3471,17 @@ void call(client *c, int flags) {
 
         /* Check if the command operated changes in the data set. If so
          * set for replication / AOF propagation. */
-        if (dirty) propagate_flags |= (PROPAGATE_AOF|PROPAGATE_REPL);       //ldc:检查是否有更新操作
+        if (dirty) propagate_flags |= (PROPAGATE_AOF|PROPAGATE_REPL);       //ldc:检查是否有更新操作,然后设置PROPAGATE_AOF|PROPAGATE_REPL
 
         /* If the client forced AOF / replication of the command, set
          * the flags regardless of the command effects on the data set. */
-        if (c->flags & CLIENT_FORCE_REPL) propagate_flags |= PROPAGATE_REPL;
+        if (c->flags & CLIENT_FORCE_REPL) propagate_flags |= PROPAGATE_REPL;        //ldc:如果设置了强制传播
         if (c->flags & CLIENT_FORCE_AOF) propagate_flags |= PROPAGATE_AOF;
 
         /* However prevent AOF / replication propagation if the command
          * implementation called preventCommandPropagation() or similar,
          * or if we don't have the call() flags to do so. */
-        if (c->flags & CLIENT_PREVENT_REPL_PROP ||
+        if (c->flags & CLIENT_PREVENT_REPL_PROP ||      //ldc:如果调用 preventCommandPropagation() 函数来阻止传播,则需要去掉标志位
             !(flags & CMD_CALL_PROPAGATE_REPL))
                 propagate_flags &= ~PROPAGATE_REPL;
         if (c->flags & CLIENT_PREVENT_AOF_PROP ||
@@ -3491,7 +3491,7 @@ void call(client *c, int flags) {
         /* Call alsoPropagate() only if at least one of AOF / replication
          * propagation is needed. */
         if (propagate_flags != PROPAGATE_NONE)
-            alsoPropagate(c->db->id,c->argv,c->argc,propagate_flags);       //ldc:把命令广播到AOF / Replication
+            alsoPropagate(c->db->id,c->argv,c->argc,propagate_flags);       //ldc:把命令广播到 AOF / Replication
     }
 
     /* Restore the old replication flags, since call() can be executed

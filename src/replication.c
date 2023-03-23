@@ -466,8 +466,8 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
         server.slaveseldb = dictid;
     }
 
-    /* Write the command to the replication buffer if any. */
-    char aux[LONG_STR_SIZE+3];
+    /* Write the command to the replication buffer if any. */       //ldc:把命令写入repl_backlog
+    char aux[LONG_STR_SIZE+3];      //ldc:长整型21位, *, \r, \n 3位
 
     /* Add the multi bulk reply length. */
     aux[0] = '*';

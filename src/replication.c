@@ -428,7 +428,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
      * propagate *identical* replication stream. In this way this slave can
      * advertise the same replication ID as the master (since it shares the
      * master replication history and has the same backlog and offsets). */
-    if (server.masterhost != NULL) return;
+    if (server.masterhost != NULL) return;      //ldc:不是最顶层的master,则直接返回
 
     /* If there aren't slaves, and there is no backlog buffer to populate,
      * we can return ASAP. */
@@ -442,7 +442,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
     prepareReplicasToWrite();
 
     /* Send SELECT command to every slave if needed. */
-    if (server.slaveseldb != dictid) {
+    if (server.slaveseldb != dictid) {        //ldc:先将 SELECT dictid 序列化成rdb格式字符串
         robj *selectcmd;
 
         /* For a few DBs we have pre-computed SELECT command. */
@@ -455,10 +455,10 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
             selectcmd = createObject(OBJ_STRING,
                 sdscatprintf(sdsempty(),
                 "*2\r\n$6\r\nSELECT\r\n$%d\r\n%s\r\n",
-                dictid_len, llstr));
+                dictid_len, llstr));        //ldc:序列化 SELECT dictid
         }
 
-        feedReplicationBufferWithObject(selectcmd);
+        feedReplicationBufferWithObject(selectcmd);     //ldc:把selectcmd添加到repl_backlog
 
         if (dictid < 0 || dictid >= PROTO_SHARED_SELECT_CMDS)
             decrRefCount(selectcmd);

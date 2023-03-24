@@ -346,7 +346,7 @@ void feedReplicationBuffer(char *s, size_t len) {
         s += copy;
         len -= copy;
     }
-    if (len) {
+    if (len) {      //ldc:如果replBufBlock溢出，则剩下新的replBufBlock(最小16kb，如果超过16kb，则一次申请足够的内存空间)
         /* Create a new node, make sure it is allocated to at
          * least PROTO_REPLY_CHUNK_BYTES */
         size_t usable_size;

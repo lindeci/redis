@@ -96,32 +96,32 @@
 #define HAVE_DEFRAG
 #endif
 
-void *zmalloc(size_t size);
-void *zcalloc(size_t size);
+void *zmalloc(size_t size);     //ldc:基于 malloc 实现的动态内存分配函数
+void *zcalloc(size_t size);     //ldc:基于 calloc 实现的动态内存分配函数，和 malloc 的区别是，该可对分配内存进行初始化工作；
 void *zcalloc_num(size_t num, size_t size);
-void *zrealloc(void *ptr, size_t size);
-void *ztrymalloc(size_t size);
-void *ztrycalloc(size_t size);
-void *ztryrealloc(void *ptr, size_t size);
-void zfree(void *ptr);
-void *zmalloc_usable(size_t size, size_t *usable);
+void *zrealloc(void *ptr, size_t size);     //ldc:重新分配指定内存，并初始化；
+void *ztrymalloc(size_t size);      //ldc:尝试分配内存
+void *ztrycalloc(size_t size);      //ldc:尝试分配内存并初始化
+void *ztryrealloc(void *ptr, size_t size);      //ldc:尝试重新分配指定内存
+void zfree(void *ptr);      //ldc:释放指定内存
+void *zmalloc_usable(size_t size, size_t *usable);      //ldc:动态内存分配并返回可用内存大小；
 void *zcalloc_usable(size_t size, size_t *usable);
 void *zrealloc_usable(void *ptr, size_t size, size_t *usable);
 void *ztrymalloc_usable(size_t size, size_t *usable);
 void *ztrycalloc_usable(size_t size, size_t *usable);
 void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable);
 void zfree_usable(void *ptr, size_t *usable);
-char *zstrdup(const char *s);
-size_t zmalloc_used_memory(void);
-void zmalloc_set_oom_handler(void (*oom_handler)(size_t));
-size_t zmalloc_get_rss(void);
-int zmalloc_get_allocator_info(size_t *allocated, size_t *active, size_t *resident);
-void set_jemalloc_bg_thread(int enable);
-int jemalloc_purge();
-size_t zmalloc_get_private_dirty(long pid);
-size_t zmalloc_get_smap_bytes_by_field(char *field, long pid);
-size_t zmalloc_get_memory_size(void);
-void zlibc_free(void *ptr);
+char *zstrdup(const char *s);       //ldc:拷贝指定字符串；
+size_t zmalloc_used_memory(void);       //ldc:获取已使用内存大小；
+void zmalloc_set_oom_handler(void (*oom_handler)(size_t));      //ldc:设置内存溢出句柄；
+size_t zmalloc_get_rss(void);       //ldc:获取实际使用内存大小，RSS（Resident Set Size）实际使用物理内存（包含共享库占用的内存）；
+int zmalloc_get_allocator_info(size_t *allocated, size_t *active, size_t *resident);        //ldc:获取指定内存状态等信息；
+void set_jemalloc_bg_thread(int enable);        //ldc:设置后台进程；
+int jemalloc_purge();       //ldc: 释放未使用的内存；
+size_t zmalloc_get_private_dirty(long pid);     //ldc:获取指定进程被标记为私有脏页大小；
+size_t zmalloc_get_smap_bytes_by_field(char *field, long pid);      //ldc:接口获取指定字段的统计；
+size_t zmalloc_get_memory_size(void);       //ldc: 获取物理内存的大小；
+void zlibc_free(void *ptr);     //ldc: 释放内存；
 void zmadvise_dontneed(void *ptr);
 
 #ifdef HAVE_DEFRAG

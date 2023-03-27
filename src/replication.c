@@ -110,7 +110,7 @@ int bg_unlink(const char *filename) {
 
 /* ---------------------------------- MASTER -------------------------------- */
 
-void createReplicationBacklog(void) {
+void createReplicationBacklog(void) {       //ldc:初始化repl_backlog
     serverAssert(server.repl_backlog == NULL);
     server.repl_backlog = zmalloc(sizeof(replBacklog));
     server.repl_backlog->ref_repl_buf_node = NULL;
@@ -280,7 +280,7 @@ void incrementalTrimReplicationBacklog(size_t max_blocks) {
 
         /* Go to use next replication buffer block node. */
         listNode *next = listNextNode(first);
-        server.repl_backlog->ref_repl_buf_node = next;
+        server.repl_backlog->ref_repl_buf_node = next;      //ldc:server.repl_backlog->ref_repl_buf_node指向下个节点
         serverAssert(server.repl_backlog->ref_repl_buf_node != NULL);
         /* Incr reference count to keep the new head node. */
         ((replBufBlock *)listNodeValue(next))->refcount++;
@@ -415,7 +415,7 @@ void feedReplicationBuffer(char *s, size_t len) {
  * received by our clients in order to create the replication stream.
  * Instead if the instance is a replica and has sub-replicas attached, we use
  * replicationFeedStreamFromMasterStream() */
-void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
+void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {       //ldc:1、检查本次请求是不是切换了db，如果切换了db就积累select DB的backlog后传播select DB给slave 2、将本次请求的参数个数转成协议格式"*参数数量\r\n"，写到backlog、 3、根据命令的参数个数循环将命令写入backlog
     int j, len;
     char llstr[LONG_STR_SIZE];
 
@@ -442,7 +442,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
     prepareReplicasToWrite();
 
     /* Send SELECT command to every slave if needed. */
-    if (server.slaveseldb != dictid) {        //ldc:先将 SELECT dictid 序列化成rdb格式字符串
+    if (server.slaveseldb != dictid) {        //ldc:dictid是本次命令的db，slaveseldb是上一次发给slave的db，所以只要切换了db，那么要先在backlog中写上当前的db，然后再发给slave，这样判断一下也避免如果一直不切换db，会一直写select到backlog和发给slave
         robj *selectcmd;
 
         /* For a few DBs we have pre-computed SELECT command. */

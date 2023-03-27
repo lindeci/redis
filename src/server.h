@@ -1074,8 +1074,8 @@ typedef struct replBacklog {
     rax *blocks_index;           /* The index of recorded blocks of replication
                                   * buffer for quickly searching replication
                                   * offset on partial resynchronization. */
-    long long histlen;           /* Backlog actual data length */
-    long long offset;            /* Replication "master offset" of first
+    long long histlen;           /* Backlog actual data length */       //ldc:从初始化或者重置backlog到现在命令请求的总长度，对应INFO状态中：repl_backlog_histlen
+    long long offset;            /* Replication "master offset" of first        //ldc:是当前backlog第一个字节的复制偏移量，个人认为理解为是保存backlog的偏移的最小值比较形象，对应INFO状态中：repl_backlog_first_byte_offset
                                   * byte in the replication backlog buffer.*/
 } replBacklog;
 
@@ -1183,9 +1183,9 @@ typedef struct client {
     listNode *mem_usage_bucket_node;        //ldc:某个桶的内存使用大小
     clientMemUsageBucket *mem_usage_bucket;        //ldc:某个client list桶的内存使用大小
 
-    listNode *ref_repl_buf_node; /* Referenced node of replication buffer blocks,
+    listNode *ref_repl_buf_node; /* Referenced node of replication buffer blocks,       //ldc:server.repl_buffer_blocks的开始节点
                                   * see the definition of replBufBlock. */
-    size_t ref_block_pos;        /* Access position of referenced buffer block,
+    size_t ref_block_pos;        /* Access position of referenced buffer block,       //ldc:server.repl_buffer_blocks的开始节点->偏移量
                                   * i.e. the next offset to send. */
 
     /* Response buffer */
@@ -1771,8 +1771,8 @@ struct redisServer {
     list *repl_buffer_blocks;       /* Replication buffers blocks list
                                      * (serving replica clients and repl backlog) */
     /* Replication (slave) */
-    char *masteruser;               /* AUTH with this user and masterauth with master */        //ldc:授权给主库的用户
-    sds masterauth;                 /* AUTH with this password with master */        //ldc:授权给主库的密码
+    char *masteruser;               /* AUTH with this user and masterauth with master */        //ldc:主库的用户
+    sds masterauth;                 /* AUTH with this password with master */        //ldc:主库的密码
     char *masterhost;               /* Hostname of master */        //ldc:主库的IP
     int masterport;                 /* Port of master */        //ldc:主库的端口
     int repl_timeout;               /* Timeout after N seconds of master idle */        //ldc:从节点超时时间。默认60

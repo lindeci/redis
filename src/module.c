@@ -1109,15 +1109,15 @@ RedisModuleCommand *moduleCreateCommandProxy(struct RedisModule *module, sds dec
 int RM_CreateCommand(RedisModuleCtx *ctx, const char *name, RedisModuleCmdFunc cmdfunc, const char *strflags, int firstkey, int lastkey, int keystep) {
     int64_t flags = strflags ? commandFlagsFromString((char*)strflags) : 0;
     if (flags == -1) return REDISMODULE_ERR;
-    if ((flags & CMD_MODULE_NO_CLUSTER) && server.cluster_enabled)
+    if ((flags & CMD_MODULE_NO_CLUSTER) && server.cluster_enabled)      //ldc:如果strflags的标志不需要cluster，但server开启了cluster,则返回错误
         return REDISMODULE_ERR;
 
     /* Check if the command name is busy. */
-    if (lookupCommandByCString(name) != NULL)
+    if (lookupCommandByCString(name) != NULL)       //ldc:从server.commands检查注册的命令name是否被占用
         return REDISMODULE_ERR;
 
     sds declared_name = sdsnew(name);
-    RedisModuleCommand *cp = moduleCreateCommandProxy(ctx->module, declared_name, sdsdup(declared_name), cmdfunc, flags, firstkey, lastkey, keystep);
+    RedisModuleCommand *cp = moduleCreateCommandProxy(ctx->module, declared_name, sdsdup(declared_name), cmdfunc, flags, firstkey, lastkey, keystep);       //ldc:创建RedisModuleCommand
     cp->rediscmd->arity = cmdfunc ? -1 : -2; /* Default value, can be changed later via dedicated API */
 
     serverAssert(dictAdd(server.commands, sdsdup(declared_name), cp->rediscmd) == DICT_OK);
@@ -1998,7 +1998,7 @@ void moduleListFree(void *config) {
     zfree(config);
 }
 
-void RM_SetModuleAttribs(RedisModuleCtx *ctx, const char *name, int ver, int apiver) {
+void RM_SetModuleAttribs(RedisModuleCtx *ctx, const char *name, int ver, int apiver) {      //ldc:module->name = sdsnew(name);  ctx->module = module;
     /* Called by RM_Init() to setup the `ctx->module` structure.
      *
      * This is an internal function, Redis modules developers don't need
@@ -12489,9 +12489,9 @@ int RM_GetDbIdFromDefragCtx(RedisModuleDefragCtx *ctx) {
 /* Register all the APIs we export. Keep this function at the end of the
  * file so that's easy to seek it to add new entries. */
 void moduleRegisterCoreAPI(void) {
-    server.moduleapi = dictCreate(&moduleAPIDictType);
+    server.moduleapi = dictCreate(&moduleAPIDictType);      //ldc:创建API字典
     server.sharedapi = dictCreate(&moduleAPIDictType);
-    REGISTER_API(Alloc);
+    REGISTER_API(Alloc);        //注册接口
     REGISTER_API(TryAlloc);
     REGISTER_API(Calloc);
     REGISTER_API(Realloc);

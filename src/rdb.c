@@ -1472,7 +1472,7 @@ int rdbSaveBackground(int req, char *filename, rdbSaveInfo *rsi) {
     server.dirty_before_bgsave = server.dirty;
     server.lastbgsave_try = time(NULL);
 
-    if ((childpid = redisFork(CHILD_TYPE_RDB)) == 0) {
+    if ((childpid = redisFork(CHILD_TYPE_RDB)) == 0) {      //ldc:fork一个子进程用于生成RDB文件
         int retval;
 
         /* Child */

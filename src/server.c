@@ -1402,9 +1402,9 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) { 
      * If Redis is trying to failover then run the replication cron faster so
      * progress on the handshake happens more quickly. */
     if (server.failover_state != NO_FAILOVER) {     //ldc:执行replicationCron
-        run_with_period(100) replicationCron();
+        run_with_period(100) replicationCron();     //ldc:failover状态时100毫秒执行一次replicationCron
     } else {
-        run_with_period(1000) replicationCron();
+        run_with_period(1000) replicationCron();     //ldc:非failover状态时1000毫秒执行一次replicationCron
     }
 
     /* Run the Redis Cluster cron. */

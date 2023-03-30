@@ -904,7 +904,7 @@ typedef struct clientReplyBlock {
 /* Similar with 'clientReplyBlock', it is used for shared buffers between
  * all replica clients and replication backlog. */
 typedef struct replBufBlock {
-    int refcount;           /* Number of replicas or repl backlog using. */
+    int refcount;           /* Number of replicas or repl backlog using. */     //ldc:每个slave和backlog引用时，都会+1，trim时-1，backlog移动到下个节点时+1. 为1时才会被trim
     long long id;           /* The unique incremental number. */
     long long repl_offset;  /* Start replication offset of the block. */
     size_t size, used;
@@ -1129,7 +1129,7 @@ typedef struct client {
     off_t repldbsize;       /* Replication DB file size. */     //ldc:从库文件大小
     sds replpreamble;       /* Replication DB preamble. */      //ldc:repl序言
     long long read_reploff; /* Read replication offset if this is a master. */      //ldc:如果这是master,代表读取复制偏移量
-    long long reploff;      /* Applied replication offset if this is a master. */       //ldc:      //ldc:如果这是master,代表应用复制偏移量
+    long long reploff;      /* Applied replication offset if this is a master. */       //ldc:如果这是master,代表应用复制偏移量
     long long repl_applied; /* Applied replication data count in querybuf, if this is a replica. */     //ldc:如果是从库,表示应用的字节数
     long long repl_ack_off; /* Replication ack offset, if this is a slave. */       //ldc:如果是slave,代表ack的偏移量
     long long repl_ack_time;/* Replication ack time, if this is a slave. */     //ldc:如果是slave,代表ack的时间
@@ -1183,9 +1183,9 @@ typedef struct client {
     listNode *mem_usage_bucket_node;        //ldc:某个桶的内存使用大小
     clientMemUsageBucket *mem_usage_bucket;        //ldc:某个client list桶的内存使用大小
 
-    listNode *ref_repl_buf_node; /* Referenced node of replication buffer blocks,       //ldc:server.repl_buffer_blocks的开始节点
+    listNode *ref_repl_buf_node; /* Referenced node of replication buffer blocks,       //ldc:server.repl_buffer_blocks的读取节点
                                   * see the definition of replBufBlock. */
-    size_t ref_block_pos;        /* Access position of referenced buffer block,       //ldc:server.repl_buffer_blocks的开始节点->偏移量
+    size_t ref_block_pos;        /* Access position of referenced buffer block,       //ldc:server.repl_buffer_blocks的读取节点的偏移量
                                   * i.e. the next offset to send. */
 
     /* Response buffer */
@@ -1500,7 +1500,7 @@ struct redisServer {
     dict *module_configs_queue; /* Dict that stores module configurations from .conf file until after modules are loaded during startup or arguments to loadex. */
     list *loadmodule_queue;     /* List of modules to load at startup. */
     int module_pipe[2];         /* Pipe used to awake the event loop by module threads. */
-    pid_t child_pid;            /* PID of current child */
+    pid_t child_pid;            /* PID of current child */      //ldc:初始化时为-1
     int child_type;             /* Type of current child */
     /* Networking */
     int port;                   /* TCP listening port */       //ldc:TCP监听端口
@@ -1759,7 +1759,7 @@ struct redisServer {
     time_t repl_no_slaves_since;    /* We have no slaves since that time.       //ldc:没有从库的开始时间
                                        Only valid if server.slaves len is 0. */
     int repl_min_slaves_to_write;   /* Min number of slaves to write. */        //ldc:最少同步的从库个数
-    int repl_min_slaves_max_lag;    /* Max lag of <count> slaves to write. */       //ldc:最多同步的从库个数
+    int repl_min_slaves_max_lag;    /* Max lag of <count> slaves to write. */       //ldc:从库最大延迟的最小值
     int repl_good_slaves_count;     /* Number of slaves with lag <= max_lag. */     //ldc:有效从库个数
     int repl_diskless_sync;         /* Master send RDB to slaves sockets directly. */       //ldc:RDB不需要落盘，通过socket传给slave
     int repl_diskless_load;         /* Slave parse RDB directly from the socket.        //ldc:REPL_DISKLESS_LOAD_DISABLED、REPL_DISKLESS_LOAD_WHEN_DB_EMPTY、REPL_DISKLESS_LOAD_SWAPDB

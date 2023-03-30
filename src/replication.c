@@ -439,7 +439,7 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {   
 
     /* Must install write handler for all replicas first before feeding
      * replication stream. */
-    prepareReplicasToWrite();
+    prepareReplicasToWrite();       //ldc:检查有哪些slaves，然后放进server.clients_pending_write列表中
 
     /* Send SELECT command to every slave if needed. */
     if (server.slaveseldb != dictid) {        //ldc:dictid是本次命令的db，slaveseldb是上一次发给slave的db，所以只要切换了db，那么要先在backlog中写上当前的db，然后再发给slave，这样判断一下也避免如果一直不切换db，会一直写select到backlog和发给slave
@@ -3202,7 +3202,7 @@ void roleCommand(client *c) {
 /* Send a REPLCONF ACK command to the master to inform it about the current
  * processed offset. If we are not connected with a master, the command has
  * no effects. */
-void replicationSendAck(void) {
+void replicationSendAck(void) {     //ldc:向master发送 REPLCONF ACK c->reploff
     client *c = server.master;
 
     if (c != NULL) {
@@ -3569,7 +3569,7 @@ void replicationCron(void) {
     }
 
     /* Bulk transfer I/O timeout? */
-    if (server.masterhost && server.repl_state == REPL_STATE_TRANSFER &&
+    if (server.masterhost && server.repl_state == REPL_STATE_TRANSFER &&        //ldc:如果这个是slave，连接状态是REPL_STATE_TRANSFER，并且跟master通讯中断超过server.repl_timeout秒(默认60)
         (time(NULL)-server.repl_transfer_lastio) > server.repl_timeout)
     {
         serverLog(LL_WARNING,"Timeout receiving bulk data from MASTER... If the problem persists try to set the 'repl-timeout' parameter in redis.conf to a larger value.");
@@ -3577,7 +3577,7 @@ void replicationCron(void) {
     }
 
     /* Timed out master when we are an already connected slave? */
-    if (server.masterhost && server.repl_state == REPL_STATE_CONNECTED &&
+    if (server.masterhost && server.repl_state == REPL_STATE_CONNECTED &&        //ldc:如果这个是slave，连接状态是REPL_STATE_CONNECTED，并且跟master通讯互动超过server.repl_timeout秒(默认60)
         (time(NULL)-server.master->lastinteraction) > server.repl_timeout)
     {
         serverLog(LL_WARNING,"MASTER timeout: no data nor PING received...");
@@ -3585,7 +3585,7 @@ void replicationCron(void) {
     }
 
     /* Check if we should connect to a MASTER */
-    if (server.repl_state == REPL_STATE_CONNECT) {      //ldc:slaveof后,1、连接master
+    if (server.repl_state == REPL_STATE_CONNECT) {      //ldc:如果salve状态是REPL_STATE_CONNECT，则连接master
         serverLog(LL_NOTICE,"Connecting to MASTER %s:%d",
             server.masterhost, server.masterport);      //ldc:打印* Connecting to MASTER 172.16.13.197:6379
         connectWithMaster();        //ldc:slave 连接到 master服务器
@@ -3594,9 +3594,9 @@ void replicationCron(void) {
     /* Send ACK to master from time to time.
      * Note that we do not send periodic acks to masters that don't
      * support PSYNC and replication offsets. */
-    if (server.masterhost && server.master &&      //ldc:slaveof后,1、连接master 2、发送ping命令检查套接字读写状态、服务器是否正常
+    if (server.masterhost && server.master &&      //ldc:如果是slave，并且master状态是CLIENT_PRE_PSYNC，则发送ack
         !(server.master->flags & CLIENT_PRE_PSYNC))
-        replicationSendAck();
+        replicationSendAck();     //ldc:向master发送心跳 REPLCONF ACK c->reploff
 
     /* If we have attached slaves, PING them from time to time.
      * So slaves can implement an explicit timeout to masters, and will
@@ -3607,7 +3607,7 @@ void replicationCron(void) {
     robj *ping_argv[1];
 
     /* First, send PING according to ping_slave_period. */
-    if ((replication_cron_loops % server.repl_ping_slave_period) == 0 &&
+    if ((replication_cron_loops % server.repl_ping_slave_period) == 0 &&        //ldc:如果这是主库
         listLength(server.slaves))
     {
         /* Note that we don't send the PING if the clients are paused during
@@ -3622,7 +3622,7 @@ void replicationCron(void) {
 
         if (!manual_failover_in_progress) {
             ping_argv[0] = shared.ping;
-            replicationFeedSlaves(server.slaves, server.slaveseldb,
+            replicationFeedSlaves(server.slaves, server.slaveseldb,     //ldc:master每10秒给slave发送ping
                 ping_argv, 1);
         }
     }
@@ -3642,7 +3642,7 @@ void replicationCron(void) {
      * ping period and refresh the connection once per second since certain
      * timeouts are set at a few seconds (example: PSYNC response). */
     listRewind(server.slaves,&li);
-    while((ln = listNext(&li))) {
+    while((ln = listNext(&li))) {       //ldc:给从库发送\n,不会影响偏移量，用于更新interaction timer
         client *slave = ln->value;
 
         int is_presync =
@@ -3650,7 +3650,7 @@ void replicationCron(void) {
             (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_END &&
              server.rdb_child_type != RDB_CHILD_TYPE_SOCKET));
 
-        if (is_presync) {
+        if (is_presync) {       //ldc:如果server->slave[i]->replstate为SLAVE_STATE_WAIT_BGSAVE_START或者(SLAVE_STATE_WAIT_BGSAVE_END && server.rdb_child_type != RDB_CHILD_TYPE_SOCKET)，则发送\n
             connWrite(slave->conn, "\n", 1);
         }
     }
@@ -3664,10 +3664,10 @@ void replicationCron(void) {
         while((ln = listNext(&li))) {
             client *slave = ln->value;
 
-            if (slave->replstate == SLAVE_STATE_ONLINE) {
+            if (slave->replstate == SLAVE_STATE_ONLINE) {       //ldc:如果从库连接状态为SLAVE_STATE_ONLINE，client状态是CLIENT_PRE_PSYNC
                 if (slave->flags & CLIENT_PRE_PSYNC)
                     continue;
-                if ((server.unixtime - slave->repl_ack_time) > server.repl_timeout) {
+                if ((server.unixtime - slave->repl_ack_time) > server.repl_timeout) {       //ldc:如果距离slave的repl_ack_time超过server.repl_timeout（默认60秒)，则断开连接
                     serverLog(LL_WARNING, "Disconnecting timedout replica (streaming sync): %s",
                           replicationGetSlaveName(slave));
                     freeClient(slave);
@@ -3679,7 +3679,7 @@ void replicationCron(void) {
              * from terminating. */
             if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_END && server.rdb_child_type == RDB_CHILD_TYPE_SOCKET) {
                 if (slave->repl_last_partial_write != 0 &&
-                    (server.unixtime - slave->repl_last_partial_write) > server.repl_timeout)
+                    (server.unixtime - slave->repl_last_partial_write) > server.repl_timeout)       //ldc:如果RDB是通过socket传送，slave连接状态是SLAVE_STATE_WAIT_BGSAVE_END，且repl_last_partial_write超过server.repl_timeout（默认60秒)，则断开连接
                 {
                     serverLog(LL_WARNING, "Disconnecting timedout replica (full sync): %s",
                           replicationGetSlaveName(slave));
@@ -3697,7 +3697,7 @@ void replicationCron(void) {
      * backlog, in order to reply to PSYNC queries if they are turned into
      * masters after a failover. */
     if (listLength(server.slaves) == 0 && server.repl_backlog_time_limit &&
-        server.repl_backlog && server.masterhost == NULL)
+        server.repl_backlog && server.masterhost == NULL)       //ldc:如果这是master且没slave，master超过server.repl_backlog_time_limit（默认3600秒)没slave，则释放Backlog
     {
         time_t idle = server.unixtime - server.repl_no_slaves_since;
 
@@ -3737,25 +3737,25 @@ void replicationCron(void) {
      * must be referenced by someone, since it will be freed when not referenced,
      * otherwise, server will OOM. also, its refcount must not be more than
      * replicas number + 1(replication backlog). */
-    if (listLength(server.repl_buffer_blocks) > 0) {
+    if (listLength(server.repl_buffer_blocks) > 0) {        //ldc:检查server->repl_buffer_blocks->refcount是否小于(int)listLength(server.slaves)+1
         replBufBlock *o = listNodeValue(listFirst(server.repl_buffer_blocks));
         serverAssert(o->refcount > 0 &&
             o->refcount <= (int)listLength(server.slaves)+1);
     }
 
     /* Refresh the number of slaves with lag <= min-slaves-max-lag. */
-    refreshGoodSlavesCount();
+    refreshGoodSlavesCount();       //ldc:更新有效从库个数
     replication_cron_loops++; /* Incremented with frequency 1 HZ. */
 }
 
-int shouldStartChildReplication(int *mincapa_out, int *req_out) {
+int shouldStartChildReplication(int *mincapa_out, int *req_out) {       //ldc:如果已经有BGSAVE的lave,则diskless复制则需要等待xxx秒
     /* We should start a BGSAVE good for replication if we have slaves in
      * WAIT_BGSAVE_START state.
      *
      * In case of diskless replication, we make sure to wait the specified
      * number of seconds (according to configuration) so that other slaves
      * have the time to arrive before we start streaming. */
-    if (!hasActiveChildProcess()) {
+    if (!hasActiveChildProcess()) {     //ldc:Redis至多只允许一个子进程运行，而Master节点进行全量复制时需要fork一个子进程来进行RDB文件的生成
         time_t idle, max_idle = 0;
         int slaves_waiting = 0;
         int mincapa;
@@ -3765,13 +3765,13 @@ int shouldStartChildReplication(int *mincapa_out, int *req_out) {
         listIter li;
 
         listRewind(server.slaves,&li);
-        while((ln = listNext(&li))) {
+        while((ln = listNext(&li))) {       //ldc:统计多少个slave节点正在等待全量数据复制
             client *slave = ln->value;
-            if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) {
+            if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) {        //ldc:找出第一个SLAVE_STATE_WAIT_BGSAVE_START的从库
                 if (first) {
                     /* Get first slave's requirements */
                     req = slave->slave_req;
-                } else if (req != slave->slave_req) {
+                } else if (req != slave->slave_req) {       //ldc:???
                     /* Skip slaves that don't match */
                     continue;
                 }
@@ -3808,7 +3808,7 @@ void replicationStartPendingFork(void) {
         /* Start the BGSAVE. The called function may start a
          * BGSAVE with socket target or disk target depending on the
          * configuration and slaves capabilities and requirements. */
-        startBgsaveForReplication(mincapa, req);
+        startBgsaveForReplication(mincapa, req);        //ldc:如果有子节点在等待，则开始进行全量复制
     }
 }
 

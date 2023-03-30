@@ -52,6 +52,7 @@ void openChildInfoPipe(void) {
     }
 }
 
+
 /* Close the pipes opened with openChildInfoPipe(). */
 void closeChildInfoPipe(void) {
     if (server.child_info_pipe[0] != -1 ||

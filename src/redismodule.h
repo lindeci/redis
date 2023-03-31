@@ -1211,10 +1211,10 @@ REDISMODULE_API int (*RedisModule_LoadConfigs)(RedisModuleCtx *ctx) REDISMODULE_
 
 /* This is included inline inside each Redis module. */
 static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int apiver) REDISMODULE_ATTR_UNUSED;
-static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int apiver) {
+static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int apiver) {       //ldc:如果name没被占用，设置ctx->module->name = sdsnew(name)
     void *getapifuncptr = ((void**)ctx)[0];     //ldc:设置GetApi函数 具体实现为RM_GetApi 由moduleLoad函数初始化
     RedisModule_GetApi = (int (*)(const char *, void *)) (unsigned long)getapifuncptr;
-    REDISMODULE_GET_API(Alloc);     //ldc:RedisModule_GetApi("RedisModule_Alloc", ((void **)&RedisModule_Alloc))
+    REDISMODULE_GET_API(Alloc);     //ldc:RedisModule_GetApi("RedisModule_Alloc", ((void **)&RedisModule_Alloc))   实际为 RM_GetApi(const char *funcname, void **targetPtrPtr)
     REDISMODULE_GET_API(TryAlloc);
     REDISMODULE_GET_API(Calloc);
     REDISMODULE_GET_API(Free);
@@ -1548,8 +1548,8 @@ static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int 
     REDISMODULE_GET_API(RegisterEnumConfig);
     REDISMODULE_GET_API(LoadConfigs);
 
-    if (RedisModule_IsModuleNameBusy && RedisModule_IsModuleNameBusy(name)) return REDISMODULE_ERR;
-    RedisModule_SetModuleAttribs(ctx,name,ver,apiver);      //ldc:static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int apiver)  ==> 实际调用 RM_SetModuleAttribs,设置module->name = sdsnew(name);  ctx->module = module;
+    if (RedisModule_IsModuleNameBusy && RedisModule_IsModuleNameBusy(name)) return REDISMODULE_ERR;     //ldc:检查name的模块是否被占用
+    RedisModule_SetModuleAttribs(ctx,name,ver,apiver);      //ldc:static int RedisModule_Init(RedisModuleCtx *ctx, const char *name, int ver, int apiver)  ==> 实际调用 RM_SetModuleAttribs,new module,设置module->name = sdsnew(name);  ctx->module = module;
     return REDISMODULE_OK;
 }
 

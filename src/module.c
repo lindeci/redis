@@ -790,7 +790,7 @@ void moduleCreateContext(RedisModuleCtx *out_ctx, RedisModule *module, int ctx_f
 
 /* This Redis command binds the normal Redis command invocation with commands
  * exported by modules. */
-void RedisModuleCommandDispatcher(client *c) {
+void RedisModuleCommandDispatcher(client *c) {      //ldc:ctx.client = c;
     RedisModuleCommand *cp = c->cmd->module_cmd;
     RedisModuleCtx ctx;
     moduleCreateContext(&ctx, cp->module, REDISMODULE_CTX_NONE);
@@ -1148,7 +1148,7 @@ RedisModuleCommand *moduleCreateCommandProxy(struct RedisModule *module, sds dec
     cp->rediscmd->declared_name = declared_name; /* SDS for module commands */
     cp->rediscmd->fullname = fullname;
     cp->rediscmd->group = COMMAND_GROUP_MODULE;
-    cp->rediscmd->proc = RedisModuleCommandDispatcher;
+    cp->rediscmd->proc = RedisModuleCommandDispatcher;      //ldc:cp->rediscmd->proc = RedisModuleCommandDispatcher
     cp->rediscmd->flags = flags | CMD_MODULE;
     cp->rediscmd->module_cmd = cp;
     cp->rediscmd->key_specs_max = STATIC_KEY_SPECS_NUM;
@@ -11265,7 +11265,7 @@ int moduleLoad(const char *path, void **module_argv, int module_argc, int is_loa
         serverLog(LL_WARNING, "Module %s failed to load: %s", path, dlerror());
         return C_ERR;
     }
-    onload = (int (*)(void *, void **, int))(unsigned long) dlsym(handle,"RedisModule_OnLoad");
+    onload = (int (*)(void *, void **, int))(unsigned long) dlsym(handle,"RedisModule_OnLoad");     //ldc:从动态库中根据字符串查找RedisModule_OnLoad，获得RedisModule_OnLoad函数指针
     if (onload == NULL) {
         dlclose(handle);
         serverLog(LL_WARNING,
@@ -11274,7 +11274,7 @@ int moduleLoad(const char *path, void **module_argv, int module_argc, int is_loa
         return C_ERR;
     }
     RedisModuleCtx ctx;
-    moduleCreateContext(&ctx, NULL, REDISMODULE_CTX_TEMP_CLIENT); /* We pass NULL since we don't have a module yet. */
+    moduleCreateContext(&ctx, NULL, REDISMODULE_CTX_TEMP_CLIENT); /* We pass NULL since we don't have a module yet. */      //ldc:out_ctx->getapifuncptr = (void*)(unsigned long)&RM_GetApi;
     if (onload((void*)&ctx,module_argv,module_argc) == REDISMODULE_ERR) {
         serverLog(LL_WARNING,
             "Module %s initialization failed. Module not loaded",path);
